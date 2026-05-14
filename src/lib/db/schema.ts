@@ -67,3 +67,27 @@ export const projects = pgTable("projects", {
  */
 export type Project = typeof projects.$inferSelect;
 export type NewProject = typeof projects.$inferInsert;
+
+/* ----------------------------------------------------------------------------
+ * Users
+ *
+ * For now: single admin. The schema supports more users later (no
+ * `is_admin` flag yet, but easy to add). Email is unique because it's
+ * effectively the username.
+ *
+ * `password_hash` stores a bcrypt hash; we never store the plaintext.
+ * `totp_secret` is added now (nullable) so we can enable 2FA in Phase 2c
+ * without another migration.
+ * ------------------------------------------------------------------------- */
+export const users = pgTable("users", {
+  id: serial("id").primaryKey(),
+  email: varchar("email", { length: 255 }).notNull().unique(),
+  passwordHash: varchar("password_hash", { length: 255 }).notNull(),
+  totpSecret: varchar("totp_secret", { length: 255 }),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
+export type User = typeof users.$inferSelect;
+export type NewUser = typeof users.$inferInsert;

@@ -8,6 +8,13 @@
       "when": 1778783485780,
       "tag": "0000_white_snowbird",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1778787706773,
+      "tag": "0001_regular_nightshade",
+      "breakpoints": true
     }
   ]
 }
