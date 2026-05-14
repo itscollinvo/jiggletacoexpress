@@ -68,7 +68,7 @@ export const SESSION_COOKIE_NAME = "jt_session";
 export const SESSION_COOKIE_OPTIONS = {
   httpOnly: true, // not readable by JS — XSS can't steal the token
   secure: process.env.NODE_ENV === "production", // HTTPS only in prod
-  sameSite: "lax" as const, // CSRF protection while allowing top-level navigation
+  sameSite: "strict" as const, // strongest CSRF protection for the admin-only session
   path: "/", // sent on all routes
   maxAge: SESSION_TTL_SECONDS,
 };

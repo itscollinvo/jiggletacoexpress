@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { Providers } from "./providers";
-import { Sidebar } from "@/components/Sidebar";
+import { AppShell } from "@/components/AppShell";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -37,12 +37,7 @@ export default function RootLayout({
     >
       <body className="min-h-full bg-background text-foreground">
         <Providers>
-          <div className="flex min-h-screen">
-            <Sidebar />
-            {/* lg:ml-64 leaves room for the fixed sidebar on desktop.
-             * On mobile, the sidebar is a slide-in drawer so no offset needed. */}
-            <main className="flex-1 lg:ml-64">{children}</main>
-          </div>
+          <AppShell>{children}</AppShell>
         </Providers>
       </body>
     </html>
