@@ -6,7 +6,7 @@
 
 import "server-only";
 import { asc } from "drizzle-orm";
-import { db } from "../index";
+import { getDb } from "../index";
 import { projects } from "../schema";
 
 /**
@@ -17,6 +17,7 @@ import { projects } from "../schema";
  * pull only featured ones, while /projects keeps showing everything.
  */
 export async function getAllProjects() {
+  const db = getDb();
   return await db
     .select()
     .from(projects)

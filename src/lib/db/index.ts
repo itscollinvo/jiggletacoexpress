@@ -1,23 +1,37 @@
 /**
  * Database client.
  *
- * Import `db` anywhere in server code (server components, API routes, server
- * actions) to query the database. NEVER import this from a client component
- * — your DB credentials would leak to the browser. Next.js will yell if you
- * try, because we use `process.env.DATABASE_URL` which only exists server-side.
+ * Call `getDb()` from server code (server components, server actions,
+ * API routes) to query the database. The first call constructs the client
+ * lazily; subsequent calls return the cached instance.
+ *
+ * Why lazy:
+ *   `next build` evaluates every page module to read exports like `dynamic`
+ *   and `metadata`. If the DB client construction (or its env-var check)
+ *   ran at module load, the build would fail anywhere DATABASE_URL isn't
+ *   set — including GitHub Actions CI, which doesn't have it. Deferring
+ *   construction means imports are side-effect-free and only request-time
+ *   code paths actually need the env var.
+ *
+ * NEVER import this from a client component — `import "server-only"` will
+ * cause a build error if you do.
  */
 
 import "server-only";
-import { drizzle } from "drizzle-orm/neon-http";
+import { drizzle, type NeonHttpDatabase } from "drizzle-orm/neon-http";
 import { neon } from "@neondatabase/serverless";
 import * as schema from "./schema";
 
-if (!process.env.DATABASE_URL) {
-  throw new Error("DATABASE_URL environment variable is not set");
-}
+type DbInstance = NeonHttpDatabase<typeof schema>;
 
-// `neon()` returns an HTTP-based SQL client. We wrap it in Drizzle to get
-// the typed query builder. We pass `schema` so methods like `db.query.projects`
-// can be auto-typed against your tables.
-const sql = neon(process.env.DATABASE_URL);
-export const db = drizzle(sql, { schema });
+let _db: DbInstance | undefined;
+
+export function getDb(): DbInstance {
+  if (_db) return _db;
+  const url = process.env.DATABASE_URL;
+  if (!url) {
+    throw new Error("DATABASE_URL environment variable is not set");
+  }
+  _db = drizzle(neon(url), { schema });
+  return _db;
+}
