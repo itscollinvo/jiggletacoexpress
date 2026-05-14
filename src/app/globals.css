@@ -1,26 +1,73 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+/* ----------------------------------------------------------------------------
+ * Theme system
+ *
+ * We define one set of CSS variables per theme, scoped under a class on <html>
+ * (set by next-themes). Components reference the variables via Tailwind tokens
+ * (see @theme inline below) so utility classes like `bg-background` and
+ * `text-foreground` automatically reflect the active theme.
+ *
+ * Override the default Tailwind v4 dark variant — by default v4 uses
+ * `prefers-color-scheme: dark`, but we want explicit class-based control
+ * so users can pick "color" mode regardless of OS settings.
+ * ------------------------------------------------------------------------- */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* Light (warm ivory) — also the default if no class is set */
+:root,
+.light {
+  --background: #FAF7F2;
+  --foreground: #2B2B2B;
+  --accent-coral: #E76F51;
+  --accent-gold: #C99700;
+  --accent-hover: #D9480F;
+  --border: rgba(43, 43, 43, 0.12);
+  --muted: rgba(43, 43, 43, 0.6);
 }
 
+/* Dark (soft black + warm beige) */
+.dark {
+  --background: #1C1C1C;
+  --foreground: #F5E8D8;
+  --accent-coral: #FF6F61;
+  --accent-gold: #DAA520;
+  --accent-hover: #FF4500;
+  --border: rgba(245, 232, 216, 0.12);
+  --muted: rgba(245, 232, 216, 0.6);
+}
+
+/* Color (deep navy + electric pink + neon gold) */
+.color {
+  --background: #121826;
+  --foreground: #F8FAFC;
+  --accent-coral: #FF4D8D;
+  --accent-gold: #FFD60A;
+  --accent-hover: #FF7A00;
+  --border: rgba(248, 250, 252, 0.12);
+  --muted: rgba(248, 250, 252, 0.6);
+}
+
+/* Map our CSS variables into Tailwind's design token system.
+ * After this, classes like `bg-background`, `text-accent-coral`,
+ * `hover:text-accent-hover` Just Work. */
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-accent-coral: var(--accent-coral);
+  --color-accent-gold: var(--accent-gold);
+  --color-accent-hover: var(--accent-hover);
+  --color-border: var(--border);
+  --color-muted: var(--muted);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans), system-ui, sans-serif;
+  /* Smooth color transitions when toggling themes. We use only
+   * background/color (not `all`) to avoid animating layout properties. */
+  transition: background-color 0.2s ease, color 0.2s ease;
 }
