@@ -1,29 +1,25 @@
 /**
  * Single project showcase card. Server component — no interactivity needed.
  *
- * The Project type is defined here and re-exported, so it lives next to the
- * component that consumes it (avoids a separate types/ folder while we're small).
+ * Type comes from the DB schema (`Project = typeof projects.$inferSelect`),
+ * so changes to the schema flow through to component props automatically.
+ * If you rename a column, TypeScript will tell you exactly which JSX needs
+ * to update.
  */
 
 import Link from "next/link";
 import { GithubIcon } from "./BrandIcons";
-
-export interface Project {
-  title: string;
-  description: string;
-  github?: string;
-  image?: string; // path under /public, e.g. "/projects/foo.png"
-}
+import type { Project } from "@/lib/db/schema";
 
 export function ProjectCard({ project }: { project: Project }) {
   return (
     <article className="group flex flex-col overflow-hidden rounded-lg border border-border bg-foreground/5 transition-colors hover:border-accent-coral">
-      {project.image && (
+      {project.imageUrl && (
         // Plain <img> is fine here — these are project thumbnails, not LCP images.
-        // When you have real assets in /public, you can swap to next/image.
+        // When we have real assets in /public, we can swap to next/image.
         // eslint-disable-next-line @next/next/no-img-element
         <img
-          src={project.image}
+          src={project.imageUrl}
           alt={project.title}
           className="aspect-video w-full object-cover"
         />
@@ -33,9 +29,9 @@ export function ProjectCard({ project }: { project: Project }) {
           {project.title}
         </h3>
         <p className="flex-1 text-sm text-muted">{project.description}</p>
-        {project.github && (
+        {project.githubUrl && (
           <Link
-            href={project.github}
+            href={project.githubUrl}
             target="_blank"
             rel="noopener noreferrer"
             className="mt-2 inline-flex items-center gap-1.5 text-sm text-accent-gold transition-colors hover:text-accent-hover"

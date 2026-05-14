@@ -1,7 +1,9 @@
 import { ProjectCard } from "@/components/ProjectCard";
-import { projects } from "@/data/projects";
+import { getAllProjects } from "@/lib/db/queries/projects";
 
-export default function ProjectsPage() {
+export default async function ProjectsPage() {
+  const projects = await getAllProjects();
+
   return (
     <div className="mx-auto max-w-5xl px-6 pt-20 pb-16 lg:px-12 lg:pt-16">
       <h1 className="text-4xl font-bold text-foreground">Projects</h1>
@@ -10,7 +12,7 @@ export default function ProjectsPage() {
       </p>
       <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {projects.map((p) => (
-          <ProjectCard key={p.title} project={p} />
+          <ProjectCard key={p.id} project={p} />
         ))}
       </div>
     </div>

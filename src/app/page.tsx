@@ -3,9 +3,14 @@ import { Mail } from "lucide-react";
 import { GithubIcon, LinkedinIcon } from "@/components/BrandIcons";
 import { NowPlaying } from "@/components/NowPlaying";
 import { ProjectCard } from "@/components/ProjectCard";
-import { projects } from "@/data/projects";
+import { getAllProjects } from "@/lib/db/queries/projects";
 
-export default function Home() {
+// `async` is allowed on Server Components — the function runs on the server,
+// awaits any data, and the result is rendered into the HTML before reaching
+// the browser. No useEffect, no loading states, no hydration data fetching.
+export default async function Home() {
+  const projects = await getAllProjects();
+
   return (
     <div className="mx-auto max-w-3xl px-6 pt-20 pb-16 lg:px-12 lg:pt-16">
       {/* Hero */}
@@ -77,7 +82,7 @@ export default function Home() {
         <h2 className="mb-6 text-2xl font-bold text-foreground">Projects</h2>
         <div className="grid gap-4 sm:grid-cols-2">
           {projects.map((project) => (
-            <ProjectCard key={project.title} project={project} />
+            <ProjectCard key={project.id} project={project} />
           ))}
         </div>
       </section>
