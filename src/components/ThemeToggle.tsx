@@ -1,5 +1,6 @@
 "use client";
 
+import { useSyncExternalStore } from "react";
 import { useTheme } from "next-themes";
 import { Sun, Moon, Sparkles } from "lucide-react";
 
@@ -18,19 +19,35 @@ const LABELS: Record<ThemeName, string> = {
   color: "Color",
 };
 
+/**
+ * Hook that returns false on the server and during the first client render
+ * (so hydration matches), then true on every render afterward.
+ *
+ * `useSyncExternalStore` has special handling for SSR:
+ *   - The server uses `getServerSnapshot` → returns false.
+ *   - The client uses `getServerSnapshot` during hydration so the result
+ *     matches the server, then re-renders using `getSnapshot` → returns true.
+ *
+ * This avoids both the hydration mismatch AND the React 19 lint rule
+ * `react-hooks/set-state-in-effect` that complains about the older
+ * `useState(false) + useEffect(() => setState(true))` pattern.
+ */
+function useIsClient(): boolean {
+  return useSyncExternalStore(
+    () => () => {}, // subscribe: no external store to listen to, return a no-op unsubscribe
+    () => true, // getSnapshot: on the client, we are mounted
+    () => false, // getServerSnapshot: on the server (and during hydration), we are not
+  );
+}
+
 export function ThemeToggle() {
   const { theme, setTheme } = useTheme();
+  const isClient = useIsClient();
 
-  // `theme` is undefined on the server and during the first client render
-  // (next-themes reads localStorage in an effect, so on initial render it
-  // hasn't run yet). We use that as our "mounted" signal — no useState,
-  // no useEffect needed.
-  //
-  // Rendering a placeholder until `theme` is defined avoids a hydration
-  // mismatch warning: the server-rendered HTML must match what the client
-  // renders on its first pass. After hydration, next-themes triggers a
-  // re-render with the real value and we swap to the live button.
-  if (!theme) {
+  // Until we're past hydration, render a placeholder identical to what the
+  // server sent. After hydration, swap to the real button reflecting the
+  // user's stored theme. No flash of wrong content; no hydration warning.
+  if (!isClient) {
     return (
       <button
         type="button"

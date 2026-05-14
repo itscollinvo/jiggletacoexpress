@@ -34,9 +34,10 @@ export default function Home() {
         </p>
 
         <div className="flex flex-wrap gap-3 pt-2">
-          {/* TODO: replace # with your real LinkedIn URL */}
           <Link
-            href="#"
+            href="https://linkedin.com/in/collinvo"
+            target="_blank"
+            rel="noopener noreferrer"
             className="inline-flex items-center gap-2 rounded-md border border-border px-4 py-2 text-sm transition-colors hover:border-accent-coral hover:text-accent-hover"
           >
             <LinkedinIcon className="h-4 w-4" />
