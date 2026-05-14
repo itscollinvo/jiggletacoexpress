@@ -1,6 +1,9 @@
 import { ProjectCard } from "@/components/ProjectCard";
 import { getAllProjects } from "@/lib/db/queries/projects";
 
+// See /src/app/page.tsx for why we force dynamic rendering.
+export const dynamic = "force-dynamic";
+
 export default async function ProjectsPage() {
   const projects = await getAllProjects();
 

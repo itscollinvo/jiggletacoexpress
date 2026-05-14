@@ -5,6 +5,12 @@ import { NowPlaying } from "@/components/NowPlaying";
 import { ProjectCard } from "@/components/ProjectCard";
 import { getAllProjects } from "@/lib/db/queries/projects";
 
+// Render this page at request time (not build time). Without this, `next build`
+// would try to pre-render the page into static HTML and fail in CI because the
+// build environment has no DATABASE_URL. In production on Vercel the page is
+// still fast (server functions are warm and cached at the edge by default).
+export const dynamic = "force-dynamic";
+
 // `async` is allowed on Server Components — the function runs on the server,
 // awaits any data, and the result is rendered into the HTML before reaching
 // the browser. No useEffect, no loading states, no hydration data fetching.
