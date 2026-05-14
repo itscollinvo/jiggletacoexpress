@@ -1,0 +1,18 @@
+# Normalize line endings: store as LF in the repo, check out as native on each OS.
+# Eliminates noisy CRLF/LF diffs between Windows and macOS/Linux contributors.
+
+* text=auto eol=lf
+
+# Treat these as binary so git doesn't try to normalize them.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.webp binary
+*.pdf binary
+*.zip binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.otf binary
