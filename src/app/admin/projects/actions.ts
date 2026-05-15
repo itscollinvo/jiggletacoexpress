@@ -23,6 +23,7 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
+import { put } from "@vercel/blob";
 import { requireCurrentUser } from "@/lib/auth/auth";
 import {
   createProject,
@@ -33,6 +34,43 @@ import {
   ProjectInputSchema,
   toDbInput,
 } from "@/lib/validation/project";
+
+const ALLOWED_IMAGE_TYPES = new Set([
+  "image/png",
+  "image/jpeg",
+  "image/webp",
+  "image/gif",
+]);
+const MAX_IMAGE_BYTES = 5 * 1024 * 1024; // 5MB
+
+/**
+ * If the form contained an image file, upload it to Vercel Blob and
+ * return the public URL. If not, return null. Throws on invalid file.
+ *
+ * Files are namespaced under `projects/` and given a timestamp prefix
+ * so collisions are essentially impossible. `addRandomSuffix: true`
+ * adds further uniqueness in case two uploads land in the same ms.
+ */
+async function maybeUploadImage(formData: FormData): Promise<string | null> {
+  const file = formData.get("imageFile");
+  if (!(file instanceof File) || file.size === 0) return null;
+
+  if (file.size > MAX_IMAGE_BYTES) {
+    throw new Error("Image must be 5MB or smaller.");
+  }
+  if (!ALLOWED_IMAGE_TYPES.has(file.type)) {
+    throw new Error(
+      "Image must be PNG, JPEG, WebP, or GIF.",
+    );
+  }
+
+  const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "-");
+  const blob = await put(`projects/${Date.now()}-${safeName}`, file, {
+    access: "public",
+    addRandomSuffix: true,
+  });
+  return blob.url;
+}
 
 /**
  * Shape of the result we return to forms. Either:
@@ -67,11 +105,27 @@ export async function createProjectAction(
 ): Promise<ActionResult> {
   await requireCurrentUser();
 
+  // 1. Upload the image first (if any). If this fails, abort before
+  //    touching the DB so we don't leave an orphan project row.
+  let uploadedImageUrl: string | null = null;
+  try {
+    uploadedImageUrl = await maybeUploadImage(formData);
+  } catch (err) {
+    return {
+      ok: false,
+      fieldErrors: {
+        imageFile: err instanceof Error ? err.message : "Image upload failed",
+      },
+    };
+  }
+
+  // 2. Validate the rest of the form. If a file was uploaded, prefer that
+  //    URL over whatever was in the (legacy) imageUrl text input.
   const parsed = ProjectInputSchema.safeParse({
     title: formData.get("title"),
     description: formData.get("description"),
     githubUrl: formData.get("githubUrl"),
-    imageUrl: formData.get("imageUrl"),
+    imageUrl: uploadedImageUrl ?? formData.get("imageUrl"),
     featured: formData.get("featured"),
     displayOrder: formData.get("displayOrder"),
   });
@@ -109,11 +163,26 @@ export async function updateProjectAction(
     return { ok: false, formError: "Invalid project id" };
   }
 
+  // Same upload-first / DB-second pattern as create. If the user picked a
+  // new file, upload it; otherwise the existing imageUrl text input value
+  // (which the form preloads with the current value) wins.
+  let uploadedImageUrl: string | null = null;
+  try {
+    uploadedImageUrl = await maybeUploadImage(formData);
+  } catch (err) {
+    return {
+      ok: false,
+      fieldErrors: {
+        imageFile: err instanceof Error ? err.message : "Image upload failed",
+      },
+    };
+  }
+
   const parsed = ProjectInputSchema.safeParse({
     title: formData.get("title"),
     description: formData.get("description"),
     githubUrl: formData.get("githubUrl"),
-    imageUrl: formData.get("imageUrl"),
+    imageUrl: uploadedImageUrl ?? formData.get("imageUrl"),
     featured: formData.get("featured"),
     displayOrder: formData.get("displayOrder"),
   });

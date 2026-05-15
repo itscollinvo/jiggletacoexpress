@@ -45,7 +45,10 @@ export function ProjectForm({ action, defaults, submitLabel }: Props) {
   const formError = !state.ok ? state.formError : undefined;
 
   return (
-    <form action={formAction} className="space-y-6">
+    // encType="multipart/form-data" is REQUIRED to send files in a form
+    // submission. Without it, the file input's value is sent as just a name
+    // string, not the actual binary contents.
+    <form action={formAction} encType="multipart/form-data" className="space-y-6">
       {/* Title */}
       <label className="block space-y-2">
         <span className="text-sm font-medium text-foreground">Title</span>
@@ -96,27 +99,70 @@ export function ProjectForm({ action, defaults, submitLabel }: Props) {
         ) : null}
       </label>
 
-      {/* Image URL — replaced with file picker in 2d.3 */}
-      <label className="block space-y-2">
+      {/* Image — file upload OR URL fallback.
+       *
+       * Two ways to provide an image:
+       *   1. Pick a file → server uploads to Vercel Blob, returns a URL,
+       *      that URL is stored as the project's imageUrl.
+       *   2. Paste an external URL into the URL field — used as-is.
+       *
+       * If both are provided, the uploaded file wins (see actions.ts).
+       * Existing image (if any) shows as a preview with the current URL
+       * pre-filled in the URL field, so saving without picking a new
+       * file leaves the image unchanged. */}
+      <div className="space-y-3">
         <span className="text-sm font-medium text-foreground">
-          Image URL{" "}
-          <span className="text-foreground/50">
-            (optional, will become an upload in a later iteration)
-          </span>
+          Image <span className="text-foreground/50">(optional)</span>
         </span>
-        <input
-          type="url"
-          name="imageUrl"
-          defaultValue={defaults?.imageUrl ?? ""}
-          placeholder="https://..."
-          className="w-full rounded-2xl border border-border bg-background px-4 py-3 text-sm text-foreground outline-none transition-colors focus:border-accent-coral"
-        />
-        {fieldErrors?.imageUrl ? (
-          <span className="text-xs text-accent-coral">
-            {fieldErrors.imageUrl}
-          </span>
+
+        {defaults?.imageUrl ? (
+          <div className="rounded-2xl border border-border bg-foreground/5 p-3">
+            <p className="mb-2 text-xs text-foreground/60">Current image:</p>
+            {/* Plain img — these are admin previews, not LCP. */}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={defaults.imageUrl}
+              alt="Current project image"
+              className="aspect-video w-full max-w-md rounded-xl object-cover"
+            />
+          </div>
         ) : null}
-      </label>
+
+        <label className="block space-y-2">
+          <span className="text-xs text-foreground/70">
+            Upload a new image (PNG / JPEG / WebP / GIF, max 5MB)
+          </span>
+          <input
+            type="file"
+            name="imageFile"
+            accept="image/png,image/jpeg,image/webp,image/gif"
+            className="block w-full text-sm text-foreground/80 file:mr-3 file:rounded-xl file:border-0 file:bg-accent-coral file:px-4 file:py-2 file:text-sm file:font-medium file:text-white hover:file:bg-accent-hover"
+          />
+          {fieldErrors?.imageFile ? (
+            <span className="text-xs text-accent-coral">
+              {fieldErrors.imageFile}
+            </span>
+          ) : null}
+        </label>
+
+        <label className="block space-y-2">
+          <span className="text-xs text-foreground/70">
+            …or paste an external URL
+          </span>
+          <input
+            type="url"
+            name="imageUrl"
+            defaultValue={defaults?.imageUrl ?? ""}
+            placeholder="https://..."
+            className="w-full rounded-2xl border border-border bg-background px-4 py-3 text-sm text-foreground outline-none transition-colors focus:border-accent-coral"
+          />
+          {fieldErrors?.imageUrl ? (
+            <span className="text-xs text-accent-coral">
+              {fieldErrors.imageUrl}
+            </span>
+          ) : null}
+        </label>
+      </div>
 
       <div className="grid gap-6 sm:grid-cols-2">
         {/* Display order */}
