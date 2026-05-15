@@ -72,3 +72,59 @@ export const SESSION_COOKIE_OPTIONS = {
   path: "/", // sent on all routes
   maxAge: SESSION_TTL_SECONDS,
 };
+
+/* ----------------------------------------------------------------------------
+ * Pending-2FA session
+ *
+ * Issued after a successful password check IF the user has TOTP enabled.
+ * Indicates "user authenticated step 1 of 2; awaiting code entry on
+ * /admin/login/2fa". The proxy lets these visit ONLY /admin/login/2fa
+ * (and the verify endpoint), nothing else.
+ *
+ * Short TTL (5 min) — if you don't enter your code in time, the cookie
+ * expires and you start over from /admin/login.
+ * ------------------------------------------------------------------------- */
+
+export const PENDING_COOKIE_NAME = "jt_2fa_pending";
+const PENDING_TTL_SECONDS = 5 * 60;
+
+export const PENDING_COOKIE_OPTIONS = {
+  httpOnly: true,
+  secure: process.env.NODE_ENV === "production",
+  sameSite: "lax" as const,
+  path: "/",
+  maxAge: PENDING_TTL_SECONDS,
+};
+
+export interface PendingPayload {
+  userId: number;
+  pending2fa: true;
+}
+
+export async function signPendingSession(
+  payload: Omit<PendingPayload, "pending2fa">,
+): Promise<string> {
+  return new SignJWT({ userId: payload.userId, pending2fa: true })
+    .setProtectedHeader({ alg: "HS256" })
+    .setSubject(String(payload.userId))
+    .setIssuedAt()
+    .setExpirationTime(`${PENDING_TTL_SECONDS}s`)
+    .sign(getSecret());
+}
+
+export async function verifyPendingSession(
+  token: string | undefined,
+): Promise<PendingPayload | null> {
+  if (!token) return null;
+  try {
+    const { payload } = await jwtVerify(token, getSecret(), {
+      algorithms: ["HS256"],
+    });
+    if (typeof payload.userId !== "number" || payload.pending2fa !== true) {
+      return null;
+    }
+    return { userId: payload.userId, pending2fa: true };
+  } catch {
+    return null;
+  }
+}
