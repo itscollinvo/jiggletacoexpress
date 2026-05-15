@@ -50,7 +50,9 @@ const db = drizzle(neon(process.env.DATABASE_URL), { schema: { users } });
 async function setup() {
   // We've already validated email and password are non-empty above; this
   // assertion narrows the types for the rest of the function.
-  const adminEmail = email!;
+  // Normalize email the same way /api/auth/login does (.trim().toLowerCase())
+  // so the bootstrap stores exactly what login will look up later.
+  const adminEmail = email!.trim().toLowerCase();
   const adminPassword = password!;
 
   console.log(`Hashing password (cost factor 12, ~250ms)...`);
