@@ -3,7 +3,7 @@ import { Mail } from "lucide-react";
 import { GithubIcon, LinkedinIcon } from "@/components/BrandIcons";
 import { NowPlaying } from "@/components/NowPlaying";
 import { ProjectCard } from "@/components/ProjectCard";
-import { getAllProjects } from "@/lib/db/queries/projects";
+import { getFeaturedProjects } from "@/lib/db/queries/projects";
 
 // Render this page at request time (not build time). Without this, `next build`
 // would try to pre-render the page into static HTML and fail in CI because the
@@ -15,7 +15,7 @@ export const dynamic = "force-dynamic";
 // awaits any data, and the result is rendered into the HTML before reaching
 // the browser. No useEffect, no loading states, no hydration data fetching.
 export default async function Home() {
-  const projects = await getAllProjects();
+  const projects = await getFeaturedProjects();
 
   return (
     <div className="mx-auto max-w-3xl px-6 pt-20 pb-16 lg:px-12 lg:pt-16">
