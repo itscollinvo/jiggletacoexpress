@@ -10,6 +10,7 @@ import {
   verifyPendingSession,
 } from "@/lib/auth/session";
 import { getSafeAdminRedirect } from "@/lib/auth/redirects";
+import { getClientIp, twoFaRateLimit } from "@/lib/rate-limit";
 
 /**
  * Second step of login when 2FA is enabled.
@@ -21,6 +22,17 @@ import { getSafeAdminRedirect } from "@/lib/auth/redirects";
  * (preserves the pending cookie so the user can retry).
  */
 export async function POST(request: NextRequest) {
+  // Rate-limit BEFORE any work. Each TOTP attempt counts. With 1M possible
+  // codes and 5 attempts per 15 minutes, expected guess time is hundreds
+  // of years — comfortably out of brute-force range.
+  const ip = getClientIp(request.headers);
+  const rate = await twoFaRateLimit.limit(ip);
+  if (!rate.success) {
+    const url = new URL("/admin/login/2fa", request.url);
+    url.searchParams.set("error", "rate-limited");
+    return NextResponse.redirect(url);
+  }
+
   const formData = await request.formData();
   const code = formData.get("code");
   const next = formData.get("next");

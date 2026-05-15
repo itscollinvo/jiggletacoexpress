@@ -11,6 +11,7 @@ import {
   signSession,
 } from "@/lib/auth/session";
 import { getSafeAdminRedirect } from "@/lib/auth/redirects";
+import { getClientIp, loginRateLimit } from "@/lib/rate-limit";
 
 function buildLoginRedirect(request: NextRequest, params?: URLSearchParams) {
   const url = new URL("/admin/login", request.url);
@@ -21,6 +22,21 @@ function buildLoginRedirect(request: NextRequest, params?: URLSearchParams) {
 }
 
 export async function POST(request: NextRequest) {
+  // Rate-limit BEFORE parsing form data so a flood of garbage POSTs costs
+  // us only one Redis check per request. Counts every attempt — including
+  // successful ones — against the IP. For a single-admin personal site
+  // that's fine; you'd never legitimately log in 5+ times in 15 minutes.
+  const ip = getClientIp(request.headers);
+  const rate = await loginRateLimit.limit(ip);
+  if (!rate.success) {
+    return NextResponse.redirect(
+      buildLoginRedirect(
+        request,
+        new URLSearchParams({ error: "rate-limited" }),
+      ),
+    );
+  }
+
   const formData = await request.formData();
   const email = formData.get("email");
   const password = formData.get("password");

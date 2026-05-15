@@ -12,6 +12,8 @@ const ERROR_MESSAGES: Record<string, string> = {
     "Missing code. Please enter the 6-digit code from your authenticator app.",
   "invalid-code":
     "That code didn't match. Try again with the current code in your app.",
+  "rate-limited":
+    "Too many code attempts from your network. Wait a few minutes and try again.",
 };
 
 type PageProps = {
