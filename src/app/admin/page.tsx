@@ -50,19 +50,21 @@ export default async function AdminDashboardPage() {
             </p>
           </Link>
 
-          <div className="rounded-3xl border border-border p-6">
+          <Link
+            href="/admin/security"
+            className="rounded-3xl border border-border p-6 transition-colors hover:border-accent-coral hover:bg-foreground/3"
+          >
             <p className="text-sm uppercase tracking-[0.2em] text-accent-gold">
-              Next up
+              Security
             </p>
             <h2 className="mt-3 text-xl font-semibold text-foreground">
-              TOTP and admin mutations
+              Two-factor authentication
             </h2>
             <p className="mt-3 text-sm leading-6 text-foreground/70">
-              Password-based login works now. The next auth slice is adding the
-              second factor flow and protecting write actions with CSRF-aware
-              mutations.
+              Enable or disable TOTP (Google Authenticator / Authy). Manage your
+              authenticator and recovery options for the admin account.
             </p>
-          </div>
+          </Link>
         </div>
       </div>
     </div>
