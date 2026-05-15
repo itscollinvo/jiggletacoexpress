@@ -6,6 +6,8 @@ import { getSafeAdminRedirect } from "@/lib/auth/redirects";
 const ERROR_MESSAGES: Record<string, string> = {
   "invalid-request": "Something was missing from the login form. Please try again.",
   "invalid-credentials": "That email or password did not match the admin account.",
+  "rate-limited":
+    "Too many login attempts from your network. Wait a few minutes and try again.",
 };
 
 type LoginPageProps = {
