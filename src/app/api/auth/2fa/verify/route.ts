@@ -30,7 +30,7 @@ export async function POST(request: NextRequest) {
   if (!rate.success) {
     const url = new URL("/admin/login/2fa", request.url);
     url.searchParams.set("error", "rate-limited");
-    return NextResponse.redirect(url);
+    return NextResponse.redirect(url, 303);
   }
 
   const formData = await request.formData();
@@ -44,11 +44,11 @@ export async function POST(request: NextRequest) {
     const url = new URL("/admin/login/2fa", request.url);
     url.searchParams.set("error", error);
     url.searchParams.set("next", safeNext);
-    return NextResponse.redirect(url);
+    return NextResponse.redirect(url, 303);
   };
 
   const buildLogin = () =>
-    NextResponse.redirect(new URL("/admin/login", request.url));
+    NextResponse.redirect(new URL("/admin/login", request.url), 303);
 
   if (typeof code !== "string") {
     return buildRetry("invalid-request");
@@ -73,7 +73,7 @@ export async function POST(request: NextRequest) {
 
   // Success — swap pending for real session.
   const sessionToken = await signSession({ userId: user.id });
-  const response = NextResponse.redirect(new URL(safeNext, request.url));
+  const response = NextResponse.redirect(new URL(safeNext, request.url), 303);
   response.cookies.set(
     SESSION_COOKIE_NAME,
     sessionToken,

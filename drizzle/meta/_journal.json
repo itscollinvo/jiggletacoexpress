@@ -15,6 +15,13 @@
       "when": 1778787706773,
       "tag": "0001_regular_nightshade",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1778866170604,
+      "tag": "0002_talented_the_watchers",
+      "breakpoints": true
     }
   ]
 }

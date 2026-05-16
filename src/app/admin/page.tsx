@@ -33,7 +33,7 @@ export default async function AdminDashboardPage() {
           </form>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-2">
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           <Link
             href="/admin/projects"
             className="rounded-3xl border border-border p-6 transition-colors hover:border-accent-coral hover:bg-foreground/3"
@@ -45,8 +45,8 @@ export default async function AdminDashboardPage() {
               Manage showcase content
             </h2>
             <p className="mt-3 text-sm leading-6 text-foreground/70">
-              Inspect the database-backed project list now, then layer create,
-              edit, feature, and image upload flows on top.
+              Create, edit, delete, and feature projects shown on the public
+              site.
             </p>
           </Link>
 
@@ -61,8 +61,24 @@ export default async function AdminDashboardPage() {
               Two-factor authentication
             </h2>
             <p className="mt-3 text-sm leading-6 text-foreground/70">
-              Enable or disable TOTP (Google Authenticator / Authy). Manage your
-              authenticator and recovery options for the admin account.
+              Enable or disable TOTP (Google Authenticator / Authy) for the
+              admin account.
+            </p>
+          </Link>
+
+          <Link
+            href="/admin/integrations"
+            className="rounded-3xl border border-border p-6 transition-colors hover:border-accent-coral hover:bg-foreground/3"
+          >
+            <p className="text-sm uppercase tracking-[0.2em] text-accent-gold">
+              Integrations
+            </p>
+            <h2 className="mt-3 text-xl font-semibold text-foreground">
+              Connected services
+            </h2>
+            <p className="mt-3 text-sm leading-6 text-foreground/70">
+              Connect Spotify (more coming) so the public site can pull live
+              data.
             </p>
           </Link>
         </div>

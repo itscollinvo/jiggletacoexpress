@@ -5,7 +5,10 @@ import {
 } from "@/lib/auth/session";
 
 export async function POST(request: Request) {
-  const response = NextResponse.redirect(new URL("/admin/login", request.url));
+  const response = NextResponse.redirect(
+    new URL("/admin/login", request.url),
+    303,
+  );
 
   response.cookies.set(SESSION_COOKIE_NAME, "", {
     ...SESSION_COOKIE_OPTIONS,
