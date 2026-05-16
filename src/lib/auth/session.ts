@@ -68,7 +68,12 @@ export const SESSION_COOKIE_NAME = "jt_session";
 export const SESSION_COOKIE_OPTIONS = {
   httpOnly: true, // not readable by JS — XSS can't steal the token
   secure: process.env.NODE_ENV === "production", // HTTPS only in prod
-  sameSite: "strict" as const, // strongest CSRF protection for the admin-only session
+  // `lax` (not `strict`) so OAuth callback flows work — when an external
+  // service like Spotify redirects the browser back to us, Strict would
+  // strip the session cookie and the callback would see us as logged out.
+  // CSRF defense for our mutating endpoints comes from Server Actions'
+  // same-origin checks and the state JWT we attach to OAuth flows.
+  sameSite: "lax" as const,
   path: "/", // sent on all routes
   maxAge: SESSION_TTL_SECONDS,
 };

@@ -91,3 +91,38 @@ export const users = pgTable("users", {
 
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
+
+/* ----------------------------------------------------------------------------
+ * Integration tokens
+ *
+ * One row per third-party service we've authenticated to (Spotify first,
+ * future: Outlook, Slack, Claude API, etc.). The `provider` column is a
+ * short string key like "spotify", "slack". We enforce uniqueness on it
+ * because we only ever have one active connection per provider per admin.
+ *
+ * `accessToken` — short-lived (typically ~1 hour for Spotify). We send it
+ *   on each API call.
+ * `refreshToken` — long-lived (months/years). Used to mint a new
+ *   accessToken when the current one expires.
+ * `expiresAt` — when the current accessToken stops working. Compared to
+ *   "now" before each API call; if expired, we refresh.
+ * `scope` — space-separated OAuth scopes the user actually granted.
+ *   Useful for sanity-checking permissions later.
+ * ------------------------------------------------------------------------- */
+export const integrationTokens = pgTable("integration_tokens", {
+  id: serial("id").primaryKey(),
+  provider: varchar("provider", { length: 64 }).notNull().unique(),
+  accessToken: text("access_token").notNull(),
+  refreshToken: text("refresh_token").notNull(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  scope: text("scope").notNull().default(""),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
+export type IntegrationToken = typeof integrationTokens.$inferSelect;
+export type NewIntegrationToken = typeof integrationTokens.$inferInsert;

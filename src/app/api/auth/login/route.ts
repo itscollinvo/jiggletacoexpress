@@ -13,6 +13,18 @@ import {
 import { getSafeAdminRedirect } from "@/lib/auth/redirects";
 import { getClientIp, loginRateLimit } from "@/lib/rate-limit";
 
+/**
+ * NOTE on redirect status codes:
+ *   - HTTP 307 = preserve method (POST → POST). Default for NextResponse.redirect().
+ *   - HTTP 303 = "See Other" — convert to GET on the next request.
+ *
+ * For Post/Redirect/Get (the standard pattern after a form submission), we
+ * want 303. Otherwise the browser re-POSTs the form data to the redirect
+ * target, which interacts badly with cookie propagation in some browsers
+ * and is semantically wrong (re-submitting a login form on every redirect).
+ */
+const SEE_OTHER = 303;
+
 function buildLoginRedirect(request: NextRequest, params?: URLSearchParams) {
   const url = new URL("/admin/login", request.url);
   if (params) {
@@ -34,6 +46,7 @@ export async function POST(request: NextRequest) {
         request,
         new URLSearchParams({ error: "rate-limited" }),
       ),
+      SEE_OTHER,
     );
   }
 
@@ -54,7 +67,7 @@ export async function POST(request: NextRequest) {
         next: safeNext,
       }),
     );
-    return NextResponse.redirect(redirectUrl);
+    return NextResponse.redirect(redirectUrl, SEE_OTHER);
   }
 
   const normalizedEmail = email.trim().toLowerCase();
@@ -68,7 +81,7 @@ export async function POST(request: NextRequest) {
         next: safeNext,
       }),
     );
-    return NextResponse.redirect(redirectUrl);
+    return NextResponse.redirect(redirectUrl, SEE_OTHER);
   }
 
   const passwordValid = await verifyPassword(password, user.passwordHash);
@@ -81,7 +94,7 @@ export async function POST(request: NextRequest) {
         next: safeNext,
       }),
     );
-    return NextResponse.redirect(redirectUrl);
+    return NextResponse.redirect(redirectUrl, SEE_OTHER);
   }
 
   // 2FA branch: if the user has TOTP enabled, don't issue a full session yet.
@@ -92,7 +105,7 @@ export async function POST(request: NextRequest) {
     const pendingToken = await signPendingSession({ userId: user.id });
     const twoFaUrl = new URL("/admin/login/2fa", request.url);
     twoFaUrl.searchParams.set("next", safeNext);
-    const response = NextResponse.redirect(twoFaUrl);
+    const response = NextResponse.redirect(twoFaUrl, SEE_OTHER);
     response.cookies.set(
       PENDING_COOKIE_NAME,
       pendingToken,
@@ -103,7 +116,7 @@ export async function POST(request: NextRequest) {
 
   const token = await signSession({ userId: user.id });
   const redirectUrl = new URL(safeNext, request.url);
-  const response = NextResponse.redirect(redirectUrl);
+  const response = NextResponse.redirect(redirectUrl, SEE_OTHER);
 
   response.cookies.set(SESSION_COOKIE_NAME, token, SESSION_COOKIE_OPTIONS);
 
