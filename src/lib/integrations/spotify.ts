@@ -98,6 +98,65 @@ export async function exchangeCodeForTokens(
   return (await res.json()) as TokenResponse;
 }
 
+// ---------------------------------------------------------------------------
+// Web API — currently-playing
+// ---------------------------------------------------------------------------
+
+export interface SpotifyArtist {
+  name: string;
+}
+
+export interface SpotifyAlbum {
+  name: string;
+  images: Array<{ url: string; width: number; height: number }>;
+}
+
+export interface SpotifyTrack {
+  name: string;
+  artists: SpotifyArtist[];
+  album: SpotifyAlbum;
+  external_urls: { spotify: string };
+}
+
+export interface SpotifyNowPlayingResponse {
+  is_playing: boolean;
+  item: SpotifyTrack | null;
+  progress_ms: number | null;
+}
+
+/**
+ * Fetch the currently-playing track for the authenticated user.
+ * Returns null when Spotify responds 204 (nothing playing / no active device).
+ */
+export async function getCurrentlyPlaying(
+  accessToken: string,
+): Promise<SpotifyNowPlayingResponse | null> {
+  const res = await fetch(
+    "https://api.spotify.com/v1/me/player/currently-playing",
+    {
+      headers: { Authorization: `Bearer ${accessToken}` },
+      // Let our Redis layer handle caching — always ask Spotify for the real state.
+      cache: "no-store",
+    },
+  );
+
+  // 204 = no active playback
+  if (res.status === 204) return null;
+
+  if (!res.ok) {
+    const errText = await res.text().catch(() => "");
+    throw new Error(
+      `Spotify currently-playing failed: ${res.status} ${errText}`,
+    );
+  }
+
+  // Guard against unexpected empty body
+  const text = await res.text();
+  if (!text) return null;
+
+  return JSON.parse(text) as SpotifyNowPlayingResponse;
+}
+
 /** Use a refresh token to mint a new access token. */
 export async function refreshAccessToken(
   refreshToken: string,
