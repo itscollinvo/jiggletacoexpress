@@ -12,6 +12,7 @@ import {
   integrationTokens,
   type NewIntegrationToken,
 } from "../schema";
+import { refreshAccessToken } from "@/lib/integrations/spotify";
 
 export async function getIntegrationToken(provider: string) {
   const db = getDb();
@@ -46,6 +47,43 @@ export async function upsertIntegrationToken(
         updatedAt: new Date(),
       },
     });
+}
+
+/**
+ * Return a valid Spotify access token, refreshing via the Spotify token
+ * endpoint if the stored token is expired (or about to expire in <60 s).
+ *
+ * Returns null when:
+ *   - No Spotify token row exists in the DB (user never connected)
+ *   - The token is expired and there is no refresh_token stored
+ */
+export async function getValidSpotifyAccessToken(): Promise<string | null> {
+  const token = await getIntegrationToken("spotify");
+  if (!token) return null;
+
+  const BUFFER_MS = 60_000; // refresh 60 s before actual expiry
+  const stillValid =
+    token.expiresAt &&
+    token.expiresAt.getTime() - Date.now() > BUFFER_MS;
+
+  if (stillValid) return token.accessToken;
+
+  // Access token is expired — try to refresh
+  if (!token.refreshToken) return null;
+
+  const refreshed = await refreshAccessToken(token.refreshToken);
+  const newExpiresAt = new Date(Date.now() + refreshed.expires_in * 1000);
+
+  await upsertIntegrationToken({
+    provider: "spotify",
+    accessToken: refreshed.access_token,
+    // Spotify may omit a new refresh_token — keep the old one if so
+    refreshToken: refreshed.refresh_token ?? token.refreshToken,
+    expiresAt: newExpiresAt,
+    scope: refreshed.scope,
+  });
+
+  return refreshed.access_token;
 }
 
 export async function deleteIntegrationToken(provider: string) {
