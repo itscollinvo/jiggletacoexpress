@@ -1,20 +1,34 @@
 /**
- * /vault/home — the authenticated landing page.
+ * /vault/home — server component.
  *
- * Placeholder shell. Phase 3 content (sticky notes, photos, journal entries)
- * will be built in here. The proxy already guarantees this page is only
- * reachable with a valid vault session cookie.
+ * Fetches real photos from the DB, merges with static notes/journal data,
+ * then passes everything to the client-side terminal. This is the standard
+ * Next.js pattern for combining server data fetching with client interactivity:
+ * the server does the I/O, the client handles the UI state.
  */
 
-export default function VaultHome() {
-  return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-background px-6">
-      <div className="flex flex-col gap-3 text-center">
-        <h1 className="text-2xl font-bold text-foreground">you&apos;re in.</h1>
-        <p className="text-sm text-muted">
-          this is the vault. content coming soon.
-        </p>
-      </div>
-    </div>
-  );
+import { getAllVaultPhotos } from "@/lib/db/queries/vault";
+import { STATIC_VAULT_DATA, type VaultData } from "@/lib/vault/filesystem";
+import { VaultTerminal } from "@/components/vault/Terminal";
+
+export const dynamic = "force-dynamic";
+
+export default async function VaultHome() {
+  const dbPhotos = await getAllVaultPhotos();
+
+  // Build the live VaultData: DB photos + static notes/journal
+  const vaultData: VaultData = {
+    ...STATIC_VAULT_DATA,
+    photos: {
+      files: dbPhotos.map((p) => ({
+        name: p.filename,
+        kind: "photo" as const,
+        content: p.caption,
+        url: p.url,
+        createdAt: p.takenAt ?? undefined,
+      })),
+    },
+  };
+
+  return <VaultTerminal vaultData={vaultData} />;
 }
