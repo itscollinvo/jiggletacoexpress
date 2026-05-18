@@ -9,14 +9,22 @@ import {
   verifySession,
 } from "@/lib/auth/session";
 import { getSafeAdminRedirect } from "@/lib/auth/redirects";
+import {
+  VAULT_COOKIE_NAME,
+  verifyVaultSession,
+} from "@/lib/auth/vault-session";
 
 /**
  * Edge proxy (Next 16 renamed middleware -> proxy).
  *
- * Auth state matrix:
+ * Admin auth state matrix:
  *   - Full session  → all /admin/* allowed; /admin/login redirects to /admin
  *   - Pending only  → ONLY /admin/login/2fa allowed; everything else redirects there
  *   - Neither       → /admin/login allowed; everything else redirects to login
+ *
+ * Vault auth:
+ *   - /vault        → always public (the gate/entry form)
+ *   - /vault/home/* → requires vault session cookie; redirects to /vault otherwise
  *
  * The verify endpoint at /api/auth/2fa/verify is NOT matched by this proxy
  * (it's outside /admin/*); it reads the pending cookie itself.
@@ -31,6 +39,19 @@ function isProtectedAdminPath(pathname: string) {
 
 export async function proxy(request: NextRequest) {
   const { pathname, search } = request.nextUrl;
+
+  // ── Vault gate ────────────────────────────────────────────────────────────
+  // /vault itself is the public entry form — let it through always.
+  // Everything under /vault/home/* requires a valid vault session.
+  if (pathname.startsWith("/vault/home")) {
+    const vaultToken = request.cookies.get(VAULT_COOKIE_NAME)?.value;
+    const vaultSession = await verifyVaultSession(vaultToken);
+    if (!vaultSession) {
+      return NextResponse.redirect(new URL("/vault", request.url));
+    }
+    return NextResponse.next();
+  }
+  // ─────────────────────────────────────────────────────────────────────────
   const sessionToken = request.cookies.get(SESSION_COOKIE_NAME)?.value;
   const pendingToken = request.cookies.get(PENDING_COOKIE_NAME)?.value;
 
@@ -97,5 +118,7 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/admin/:path*"],
+  // /admin/:path* — admin auth
+  // /vault/home/:path* — vault auth (note: /vault itself is intentionally excluded)
+  matcher: ["/admin/:path*", "/vault/home/:path*"],
 };

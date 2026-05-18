@@ -135,12 +135,10 @@ export async function getCurrentlyPlaying(
     "https://api.spotify.com/v1/me/player/currently-playing",
     {
       headers: { Authorization: `Bearer ${accessToken}` },
-      // Let our Redis layer handle caching — always ask Spotify for the real state.
       cache: "no-store",
     },
   );
 
-  // 204 = no active playback
   if (res.status === 204) return null;
 
   if (!res.ok) {
@@ -150,7 +148,6 @@ export async function getCurrentlyPlaying(
     );
   }
 
-  // Guard against unexpected empty body
   const text = await res.text();
   if (!text) return null;
 
