@@ -7,8 +7,9 @@ import { Sidebar } from "@/components/Sidebar";
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const isAdminRoute = pathname.startsWith("/admin");
+  const isVaultRoute = pathname.startsWith("/vault");
 
-  if (isAdminRoute) {
+  if (isAdminRoute || isVaultRoute) {
     return <main className="min-h-screen">{children}</main>;
   }
 
