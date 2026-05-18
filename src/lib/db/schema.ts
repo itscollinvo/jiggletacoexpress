@@ -126,3 +126,28 @@ export const integrationTokens = pgTable("integration_tokens", {
 
 export type IntegrationToken = typeof integrationTokens.$inferSelect;
 export type NewIntegrationToken = typeof integrationTokens.$inferInsert;
+
+/* ----------------------------------------------------------------------------
+ * Vault photos
+ *
+ * Stores photos uploaded via /admin/vault. The `filename` is what appears
+ * in the terminal (e.g. "joshua-tree.jpg") — it's used as the argument to
+ * `cat`. The `url` is the Vercel Blob public URL. `takenAt` is a freeform
+ * string (e.g. "nov 2025") displayed as metadata in the terminal and gallery.
+ * ------------------------------------------------------------------------- */
+export const vaultPhotos = pgTable("vault_photos", {
+  id: serial("id").primaryKey(),
+  filename: varchar("filename", { length: 255 }).notNull(),
+  url: text("url").notNull(),
+  caption: text("caption").notNull().default(""),
+  takenAt: varchar("taken_at", { length: 100 }),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
+export type VaultPhoto = typeof vaultPhotos.$inferSelect;
+export type NewVaultPhoto = typeof vaultPhotos.$inferInsert;
