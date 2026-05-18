@@ -1,24 +1,25 @@
 /**
  * /vault/home — server component.
  *
- * Fetches real photos from the DB, merges with static notes/journal data,
- * then passes everything to the client-side terminal. This is the standard
- * Next.js pattern for combining server data fetching with client interactivity:
- * the server does the I/O, the client handles the UI state.
+ * Fetches all vault content from the DB (photos, notes, journal), then passes
+ * it to the client-side terminal. Static fallback data is kept in filesystem.ts
+ * but is no longer used here — all content is now DB-backed.
  */
 
-import { getAllVaultPhotos } from "@/lib/db/queries/vault";
-import { STATIC_VAULT_DATA, type VaultData } from "@/lib/vault/filesystem";
+import { getAllVaultPhotos, getAllVaultNotes, getAllVaultJournal } from "@/lib/db/queries/vault";
+import { type VaultData } from "@/lib/vault/filesystem";
 import { VaultTerminal } from "@/components/vault/Terminal";
 
 export const dynamic = "force-dynamic";
 
 export default async function VaultHome() {
-  const dbPhotos = await getAllVaultPhotos();
+  const [dbPhotos, dbNotes, dbJournal] = await Promise.all([
+    getAllVaultPhotos(),
+    getAllVaultNotes(),
+    getAllVaultJournal(),
+  ]);
 
-  // Build the live VaultData: DB photos + static notes/journal
   const vaultData: VaultData = {
-    ...STATIC_VAULT_DATA,
     photos: {
       files: dbPhotos.map((p) => ({
         name: p.filename,
@@ -26,6 +27,22 @@ export default async function VaultHome() {
         content: p.caption,
         url: p.url,
         createdAt: p.takenAt ?? undefined,
+      })),
+    },
+    notes: {
+      files: dbNotes.map((n) => ({
+        name: n.slug,
+        kind: "note" as const,
+        content: n.content,
+        createdAt: n.displayDate ?? undefined,
+      })),
+    },
+    journal: {
+      files: dbJournal.map((e) => ({
+        name: `${e.entryDate}.md`,
+        kind: "journal" as const,
+        content: e.content,
+        createdAt: e.entryDate,
       })),
     },
   };

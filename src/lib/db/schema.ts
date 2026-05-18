@@ -151,3 +151,51 @@ export const vaultPhotos = pgTable("vault_photos", {
 
 export type VaultPhoto = typeof vaultPhotos.$inferSelect;
 export type NewVaultPhoto = typeof vaultPhotos.$inferInsert;
+
+/* ----------------------------------------------------------------------------
+ * Vault notes
+ *
+ * Short freeform text entries that appear in the terminal as `notes/` files.
+ * `slug` becomes the filename in the terminal (e.g. "scattered-thoughts.md").
+ * `displayDate` is an optional freeform date string shown as metadata
+ * (e.g. "2026-03-12") — separate from createdAt because you may want to
+ * backdate entries.
+ * ------------------------------------------------------------------------- */
+export const vaultNotes = pgTable("vault_notes", {
+  id: serial("id").primaryKey(),
+  slug: varchar("slug", { length: 255 }).notNull(),
+  content: text("content").notNull(),
+  displayDate: varchar("display_date", { length: 100 }),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
+export type VaultNote = typeof vaultNotes.$inferSelect;
+export type NewVaultNote = typeof vaultNotes.$inferInsert;
+
+/* ----------------------------------------------------------------------------
+ * Vault journal
+ *
+ * Longer personal journal entries. `entryDate` is a freeform date string that
+ * doubles as the terminal filename (e.g. "2026-01-15" → "2026-01-15.md").
+ * Using a string here (not a date column) so you can write "jan 2026" or
+ * other imprecise dates without forcing a full timestamp.
+ * ------------------------------------------------------------------------- */
+export const vaultJournal = pgTable("vault_journal", {
+  id: serial("id").primaryKey(),
+  entryDate: varchar("entry_date", { length: 100 }).notNull(),
+  content: text("content").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
+export type VaultJournalEntry = typeof vaultJournal.$inferSelect;
+export type NewVaultJournalEntry = typeof vaultJournal.$inferInsert;

@@ -1,8 +1,10 @@
 import Link from "next/link";
-import { STATIC_VAULT_DATA } from "@/lib/vault/filesystem";
+import { getAllVaultNotes } from "@/lib/db/queries/vault";
 
-export default function VaultNotesPage() {
-  const { files } = STATIC_VAULT_DATA.notes;
+export const dynamic = "force-dynamic";
+
+export default async function VaultNotesPage() {
+  const notes = await getAllVaultNotes();
 
   return (
     <div className="px-6 py-12" style={{ maxWidth: "640px", margin: "0 auto" }}>
@@ -21,30 +23,30 @@ export default function VaultNotesPage() {
         notes/
       </h1>
 
-      {files.length === 0 ? (
+      {notes.length === 0 ? (
         <p className="text-xs tracking-widest" style={{ color: "rgba(255,255,255,0.2)", fontFamily: "ui-monospace, monospace" }}>
           (empty)
         </p>
       ) : (
         <div className="flex flex-col gap-6">
-          {files.map((note) => (
+          {notes.map((note) => (
             <div
-              key={note.name}
+              key={note.id}
               style={{
                 borderLeft: "2px solid rgba(255,255,255,0.08)",
                 paddingLeft: "1.25rem",
               }}
             >
-              {note.createdAt && (
+              {note.displayDate && (
                 <p className="mb-2 text-xs" style={{ color: "rgba(255,255,255,0.22)", fontFamily: "ui-monospace, monospace" }}>
-                  {note.createdAt}
+                  {note.displayDate}
                 </p>
               )}
               <p className="text-sm leading-relaxed whitespace-pre-wrap" style={{ color: "rgba(255,255,255,0.6)" }}>
                 {note.content}
               </p>
               <p className="mt-3 text-xs" style={{ color: "rgba(255,255,255,0.18)", fontFamily: "ui-monospace, monospace" }}>
-                {note.name}
+                {note.slug}
               </p>
             </div>
           ))}
