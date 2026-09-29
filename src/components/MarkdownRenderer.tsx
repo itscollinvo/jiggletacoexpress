@@ -26,13 +26,19 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
 import type { Components } from "react-markdown";
+import { PrCard, parseGithubPr } from "./PrCard";
 
 const isExternal = (href: string | undefined) =>
   !!href && !href.startsWith("/") && !href.startsWith("#");
 
 const components: Components = {
-  a: ({ href, children, ...props }) =>
-    isExternal(href) ? (
+  a: ({ href, children, ...props }) => {
+    // Any github.com/*/pull/N link — inline autolinked bare URL or an
+    // explicit `[text](url)` link — becomes a PrCard. This runs at RSC
+    // render time, so no client JS is needed to swap the element.
+    const pr = parseGithubPr(href);
+    if (pr) return <PrCard {...pr} />;
+    return isExternal(href) ? (
       <a
         href={href}
         target="_blank"
@@ -50,7 +56,8 @@ const components: Components = {
       >
         {children}
       </a>
-    ),
+    );
+  },
   h1: ({ children, ...props }) => (
     <h1
       className="mt-10 scroll-mt-20 text-3xl font-bold text-foreground"

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { requireCurrentUser } from "@/lib/auth/auth";
 import { getAllPosts } from "@/lib/db/queries/blog";
 import { DeletePostButton } from "./delete-button";
+import { PublishToggleButton } from "./publish-toggle-button";
 
 export const dynamic = "force-dynamic";
 
@@ -103,6 +104,10 @@ export default async function AdminBlogPage() {
                   </td>
                   <td className="px-5 py-4">
                     <div className="flex justify-end gap-2">
+                      <PublishToggleButton
+                        postId={post.id}
+                        isPublished={post.status === "published"}
+                      />
                       <Link
                         href={`/admin/blog/${post.id}/edit`}
                         className="rounded-xl border border-border px-3 py-1.5 text-xs text-foreground/80 transition-colors hover:border-accent-coral hover:text-accent-hover"
