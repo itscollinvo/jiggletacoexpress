@@ -9,7 +9,7 @@ export default async function NewBlogPostPage() {
   await requireCurrentUser();
 
   return (
-    <div className="mx-auto min-h-screen max-w-3xl px-6 py-16">
+    <div className="mx-auto min-h-screen max-w-6xl px-6 py-16">
       <div className="mb-8 space-y-2">
         <p className="text-sm uppercase tracking-[0.3em] text-accent-gold">
           New post
