@@ -20,6 +20,15 @@
  *   networks (e.g. an office) could hit the limit collectively. But it's
  *   the standard first line of defense and Vercel reliably surfaces the
  *   real client IP via x-forwarded-for.
+ *
+ * Fail-open on Redis errors:
+ *   Rate limiting is defense-in-depth, not the primary auth barrier
+ *   (bcrypt + TOTP already gate access). If Redis is missing, DNS-broken,
+ *   throttled, or the Upstash instance was decommissioned, we log the
+ *   error and let the request through. Better a temporarily-unlimited
+ *   login endpoint than a totally-broken login endpoint. If Redis is
+ *   available but consistently returns errors, we'd see it in logs and
+ *   should re-provision Upstash promptly.
  */
 
 import "server-only";
@@ -27,62 +36,86 @@ import { Ratelimit } from "@upstash/ratelimit";
 import { Redis } from "@upstash/redis";
 
 /**
- * Lazy initialization — same pattern we used for the DB client. Module
- * evaluation is side-effect-free so `next build` doesn't need Upstash
- * env vars (CI doesn't have them). Failures move from import time to
- * call time.
- */
-
-let _login: Ratelimit | undefined;
-let _twoFa: Ratelimit | undefined;
-
-/**
  * Pick whatever env vars Vercel's marketplace integration provided.
  * Vercel sometimes ships UPSTASH_REDIS_REST_URL / TOKEN, sometimes
- * KV_REST_API_URL / TOKEN (the legacy "Vercel KV" naming), depending
- * on when you set up the integration. Both point at the same backend.
+ * KV_REST_API_URL / TOKEN (the legacy "Vercel KV" naming). Returns
+ * null if neither is set (rather than throwing) so callers can decide
+ * whether to fail open or hard.
  */
-function buildRedis(): Redis {
+function tryBuildRedis(): Redis | null {
   const url =
     process.env.UPSTASH_REDIS_REST_URL ?? process.env.KV_REST_API_URL;
   const token =
     process.env.UPSTASH_REDIS_REST_TOKEN ?? process.env.KV_REST_API_TOKEN;
 
-  if (!url || !token) {
-    throw new Error(
-      "Redis env vars missing. Expected UPSTASH_REDIS_REST_URL/TOKEN or KV_REST_API_URL/TOKEN.",
-    );
-  }
+  if (!url || !token) return null;
   return new Redis({ url, token });
 }
 
-export const loginRateLimit = {
-  limit(key: string) {
-    if (!_login) {
-      _login = new Ratelimit({
-        redis: buildRedis(),
-        limiter: Ratelimit.slidingWindow(5, "15 m"),
-        prefix: "rl:login",
-        analytics: true,
-      });
-    }
-    return _login.limit(key);
-  },
+/**
+ * Shape of the rate-limit result — matches what @upstash/ratelimit returns
+ * so callers don't need special-case types. `success: true` always means
+ * "let this request through," including our fail-open branch.
+ */
+type LimitResult = {
+  success: boolean;
+  limit: number;
+  remaining: number;
+  reset: number;
 };
 
-export const twoFaRateLimit = {
-  limit(key: string) {
-    if (!_twoFa) {
-      _twoFa = new Ratelimit({
-        redis: buildRedis(),
-        limiter: Ratelimit.slidingWindow(5, "15 m"),
-        prefix: "rl:2fa",
-        analytics: true,
-      });
-    }
-    return _twoFa.limit(key);
-  },
+const ALLOWED: LimitResult = {
+  success: true,
+  limit: 5,
+  remaining: 5,
+  reset: Date.now() + 15 * 60 * 1000,
 };
+
+/**
+ * Wrap `.limit()` with try/catch. If anything goes wrong (Redis unreachable,
+ * DNS error, missing env vars, rate limiter constructor throws), log once
+ * and fail open. Callers see `success: true` and proceed as if there were
+ * no limiter — same behavior as if this file didn't exist.
+ */
+function makeLimiter(prefix: string, storeRef: { current?: Ratelimit }) {
+  return {
+    async limit(key: string): Promise<LimitResult> {
+      try {
+        if (!storeRef.current) {
+          const redis = tryBuildRedis();
+          if (!redis) {
+            console.warn(
+              `[rate-limit] Redis env vars missing; failing open for prefix=${prefix}`,
+            );
+            return ALLOWED;
+          }
+          storeRef.current = new Ratelimit({
+            redis,
+            limiter: Ratelimit.slidingWindow(5, "15 m"),
+            prefix,
+            analytics: true,
+          });
+        }
+        return await storeRef.current.limit(key);
+      } catch (err) {
+        console.error(
+          `[rate-limit] check failed for prefix=${prefix}; failing open:`,
+          err,
+        );
+        return ALLOWED;
+      }
+    },
+  };
+}
+
+// Ref-cell wrappers so makeLimiter can mutate the cached instance without
+// closing over a `let` binding. Same effect as the old `_login`/`_twoFa`
+// module-level vars.
+const loginStore: { current?: Ratelimit } = {};
+const twoFaStore: { current?: Ratelimit } = {};
+
+export const loginRateLimit = makeLimiter("rl:login", loginStore);
+export const twoFaRateLimit = makeLimiter("rl:2fa", twoFaStore);
 
 /**
  * Extract a client IP for keying the rate limit.

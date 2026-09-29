@@ -199,3 +199,53 @@ export const vaultJournal = pgTable("vault_journal", {
 
 export type VaultJournalEntry = typeof vaultJournal.$inferSelect;
 export type NewVaultJournalEntry = typeof vaultJournal.$inferInsert;
+
+/* ----------------------------------------------------------------------------
+ * Blog posts
+ *
+ * PRD-flavored change-log entries. Each post documents something that
+ * shipped: what problem it solved, how it was built, what moved.
+ * See BLOG_PLAN.md for the design rationale.
+ *
+ * `slug` is the URL segment (/blog/[slug]). Unique. Kebab-case enforced at
+ *   the Zod layer.
+ * `bodyMarkdown` is the raw markdown text. Rendered server-side (Phase B.2)
+ *   with react-markdown + remark-gfm + rehype-shiki.
+ * `changeLinks` is a Postgres text[] of PR/commit URLs the post is about.
+ *   Rendered as small cards above the body. Small counts (usually 1-3),
+ *   no separate join table needed.
+ * `tags` is a Postgres text[] for filtering on the index page.
+ * `status` is "draft" or "published" — varchar (not enum) so future
+ *   states like "scheduled" don't need an ALTER TYPE dance.
+ * `publishedAt` is set the first time a post flips to published. Used to
+ *   order the public index by publish date without touching `updatedAt`.
+ * ------------------------------------------------------------------------- */
+export const blogPosts = pgTable("blog_posts", {
+  id: serial("id").primaryKey(),
+
+  slug: varchar("slug", { length: 200 }).notNull().unique(),
+  title: varchar("title", { length: 255 }).notNull(),
+  subtitle: varchar("subtitle", { length: 500 }),
+
+  bodyMarkdown: text("body_markdown").notNull().default(""),
+
+  coverImageUrl: varchar("cover_image_url", { length: 500 }),
+  changeLinks: text("change_links").array().notNull().default([]),
+  tags: text("tags").array().notNull().default([]),
+
+  status: varchar("status", { length: 16 }).notNull().default("draft"),
+  publishedAt: timestamp("published_at", { withTimezone: true }),
+
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
+export type BlogPost = typeof blogPosts.$inferSelect;
+export type NewBlogPost = typeof blogPosts.$inferInsert;
+
+/** Narrow string union for status — helps components exhaust-check. */
+export type BlogPostStatus = "draft" | "published";
