@@ -35,9 +35,6 @@ import "server-only";
 import { Ratelimit } from "@upstash/ratelimit";
 import { Redis } from "@upstash/redis";
 
-let _login: Ratelimit | undefined;
-let _twoFa: Ratelimit | undefined;
-
 /**
  * Pick whatever env vars Vercel's marketplace integration provided.
  * Vercel sometimes ships UPSTASH_REDIS_REST_URL / TOKEN, sometimes

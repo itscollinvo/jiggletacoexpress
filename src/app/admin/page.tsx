@@ -97,6 +97,22 @@ export default async function AdminDashboardPage() {
               data.
             </p>
           </Link>
+
+          <Link
+            href="/admin/blog"
+            className="rounded-3xl border border-border p-6 transition-colors hover:border-accent-coral hover:bg-foreground/3"
+          >
+            <p className="text-sm uppercase tracking-[0.2em] text-accent-gold">
+              Blog
+            </p>
+            <h2 className="mt-3 text-xl font-semibold text-foreground">
+              Write change-log posts
+            </h2>
+            <p className="mt-3 text-sm leading-6 text-foreground/70">
+              PRD-style entries about what shipped and why. Drafts stay hidden
+              until you publish.
+            </p>
+          </Link>
         </div>
       </div>
     </div>
