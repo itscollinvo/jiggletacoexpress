@@ -1,0 +1,89 @@
+/*
+ * Theme-matched syntax highlighting for blog code blocks.
+ *
+ * Uses our site's palette (accent-coral, accent-gold, foreground/…) instead
+ * of highlight.js's stock github-dark theme. That means code blocks look
+ * consistent across light/dark modes automatically — the CSS variables
+ * themselves already swap in globals.css.
+ *
+ * Token mapping loosely follows the highlight.js class taxonomy. Reference:
+ * https://highlightjs.readthedocs.io/en/latest/css-classes-reference.html
+ *
+ * Kept minimal — a handful of high-signal categories rather than the full
+ * 30+ class list. Anything unmapped inherits the base foreground color,
+ * which is fine.
+ */
+
+.hljs {
+  color: var(--foreground);
+  background: transparent;
+}
+
+/* Comments — dimmer than body text, italic-ish feel */
+.hljs-comment,
+.hljs-quote,
+.hljs-meta {
+  color: color-mix(in oklab, var(--foreground) 45%, transparent);
+  font-style: italic;
+}
+
+/* Keywords, control flow, storage — accent gold pops without shouting */
+.hljs-keyword,
+.hljs-selector-tag,
+.hljs-literal,
+.hljs-type,
+.hljs-built_in,
+.hljs-name {
+  color: var(--accent-gold);
+}
+
+/* Strings, regex, symbols — accent coral (site's warm highlight) */
+.hljs-string,
+.hljs-regexp,
+.hljs-attr,
+.hljs-symbol,
+.hljs-bullet,
+.hljs-addition {
+  color: var(--accent-coral);
+}
+
+/* Numbers, constants — muted foreground, still legible */
+.hljs-number,
+.hljs-variable,
+.hljs-template-variable {
+  color: color-mix(in oklab, var(--foreground) 80%, var(--accent-coral));
+}
+
+/* Function + class names — bold, no color shift (so they stand out
+ * structurally without competing with keywords) */
+.hljs-title,
+.hljs-title.class_,
+.hljs-title.function_,
+.hljs-section {
+  color: var(--foreground);
+  font-weight: 600;
+}
+
+/* Tag/attribute values in HTML/XML/JSX */
+.hljs-tag,
+.hljs-attribute {
+  color: color-mix(in oklab, var(--foreground) 70%, transparent);
+}
+
+/* Diff markers */
+.hljs-deletion {
+  color: var(--accent-coral);
+  background-color: color-mix(in oklab, var(--accent-coral) 12%, transparent);
+}
+.hljs-addition {
+  color: var(--accent-gold);
+  background-color: color-mix(in oklab, var(--accent-gold) 12%, transparent);
+}
+
+/* Emphasis / strong markdown */
+.hljs-emphasis {
+  font-style: italic;
+}
+.hljs-strong {
+  font-weight: 700;
+}

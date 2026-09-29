@@ -4,6 +4,13 @@ import { GithubIcon, LinkedinIcon } from "@/components/BrandIcons";
 import { NowPlaying } from "@/components/NowPlaying";
 import { ProjectCard } from "@/components/ProjectCard";
 import { getFeaturedProjects } from "@/lib/db/queries/projects";
+import { getPublishedPosts } from "@/lib/db/queries/blog";
+
+const homeDateFmt = new Intl.DateTimeFormat(undefined, {
+  month: "long",
+  day: "numeric",
+  year: "numeric",
+});
 
 // Render this page at request time (not build time). Without this, `next build`
 // would try to pre-render the page into static HTML and fail in CI because the
@@ -15,7 +22,13 @@ export const dynamic = "force-dynamic";
 // awaits any data, and the result is rendered into the HTML before reaching
 // the browser. No useEffect, no loading states, no hydration data fetching.
 export default async function Home() {
-  const projects = await getFeaturedProjects();
+  // Parallel fetch — projects and posts hit different tables, no reason to
+  // serialize them. Promise.all shaves ~1 round-trip off cold requests.
+  const [projects, publishedPosts] = await Promise.all([
+    getFeaturedProjects(),
+    getPublishedPosts(),
+  ]);
+  const latestPost = publishedPosts[0] ?? null;
 
   return (
     <div className="mx-auto max-w-3xl px-6 pt-20 pb-16 lg:px-12 lg:pt-16">
@@ -82,6 +95,49 @@ export default async function Home() {
           spot, and I enjoy nature.
         </p>
       </section>
+
+      {/* Latest blog post teaser — hidden entirely when no posts are
+        * published yet, so the section doesn't leave an empty gap in the
+        * layout. `latestPost` comes from getPublishedPosts()[0] which is
+        * already sorted by publishedAt DESC. */}
+      {latestPost ? (
+        <section className="mt-16">
+          <div className="flex items-baseline justify-between">
+            <h2 className="text-2xl font-bold text-foreground">
+              Recently shipped
+            </h2>
+            <Link
+              href="/blog"
+              className="text-sm text-foreground/60 transition-colors hover:text-accent-hover"
+            >
+              all posts →
+            </Link>
+          </div>
+          <Link
+            href={`/blog/${latestPost.slug}`}
+            className="group mt-6 block rounded-3xl border border-border p-6 transition-colors hover:border-accent-coral hover:bg-foreground/3"
+          >
+            <div className="flex flex-wrap items-baseline justify-between gap-3">
+              <h3 className="text-lg font-semibold text-foreground transition-colors group-hover:text-accent-hover">
+                {latestPost.title}
+              </h3>
+              {latestPost.publishedAt ? (
+                <time
+                  dateTime={latestPost.publishedAt.toISOString()}
+                  className="text-xs uppercase tracking-[0.2em] text-foreground/50"
+                >
+                  {homeDateFmt.format(latestPost.publishedAt)}
+                </time>
+              ) : null}
+            </div>
+            {latestPost.subtitle ? (
+              <p className="mt-3 leading-6 text-foreground/70">
+                {latestPost.subtitle}
+              </p>
+            ) : null}
+          </Link>
+        </section>
+      ) : null}
 
       {/* Project showcase */}
       <section className="mt-16">
