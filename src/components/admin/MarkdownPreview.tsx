@@ -19,22 +19,30 @@
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type { Components } from "react-markdown";
+import { PrCard, parseGithubPr } from "@/components/PrCard";
 
 const isExternal = (href: string | undefined) =>
   !!href && !href.startsWith("/") && !href.startsWith("#");
 
 const components: Components = {
-  a: ({ href, children, ...props }) => (
-    <a
-      href={href}
-      target={isExternal(href) ? "_blank" : undefined}
-      rel={isExternal(href) ? "noopener noreferrer" : undefined}
-      className="text-accent-coral underline decoration-accent-coral/40 underline-offset-4"
-      {...props}
-    >
-      {children}
-    </a>
-  ),
+  a: ({ href, children, ...props }) => {
+    // Match the public renderer's behavior: github.com/*/pull/N links
+    // become PrCards in the preview too, so what the author sees while
+    // drafting matches what visitors will see.
+    const pr = parseGithubPr(href);
+    if (pr) return <PrCard {...pr} />;
+    return (
+      <a
+        href={href}
+        target={isExternal(href) ? "_blank" : undefined}
+        rel={isExternal(href) ? "noopener noreferrer" : undefined}
+        className="text-accent-coral underline decoration-accent-coral/40 underline-offset-4"
+        {...props}
+      >
+        {children}
+      </a>
+    );
+  },
   h1: ({ children }) => (
     <h1 className="mt-8 text-2xl font-bold text-foreground">{children}</h1>
   ),
