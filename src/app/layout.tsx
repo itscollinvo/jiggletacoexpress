@@ -18,6 +18,15 @@ export const metadata: Metadata = {
   title: "jiggletaco — Collin Vo",
   description:
     "Personal site of Collin Vo (jiggletaco) — CS student at Stevens, building full-stack apps and learning everything in between.",
+  // Discovery hint for RSS readers. When someone pastes jiggletaco.com
+  // into Feedly / NetNewsWire / etc., the reader looks for a
+  // <link rel="alternate" type="application/rss+xml"> tag to autodetect
+  // the feed URL. Without this hint, users have to know /feed.xml exists.
+  alternates: {
+    types: {
+      "application/rss+xml": [{ url: "/feed.xml", title: "Blog RSS feed" }],
+    },
+  },
 };
 
 export default function RootLayout({

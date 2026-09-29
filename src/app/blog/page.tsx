@@ -32,6 +32,15 @@ export default async function BlogIndexPage() {
         landed.
       </p>
 
+      <div className="mt-6 flex items-center gap-2 text-xs uppercase tracking-[0.2em] text-foreground/50">
+        <a
+          href="/feed.xml"
+          className="transition-colors hover:text-accent-hover"
+        >
+          RSS →
+        </a>
+      </div>
+
       {posts.length === 0 ? (
         <p className="mt-16 text-foreground/60">
           No posts yet. Come back soon.
