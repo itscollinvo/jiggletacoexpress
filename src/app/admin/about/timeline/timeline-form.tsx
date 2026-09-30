@@ -61,7 +61,7 @@ export function TimelineForm({ action, defaults, submitLabel }: Props) {
             className="w-full rounded-2xl border border-border bg-background px-4 py-3 text-sm text-foreground outline-none transition-colors focus:border-accent-coral"
           />
           <span className="text-xs text-foreground/60">
-            Lower numbers render first. Negative numbers OK (put "Present"
+            Lower numbers render first. Negative numbers OK (put &ldquo;Present&rdquo;
             at -1 to top the list).
           </span>
         </label>
