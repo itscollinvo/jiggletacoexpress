@@ -164,15 +164,53 @@ export type IntegrationToken = typeof integrationTokens.$inferSelect;
 export type NewIntegrationToken = typeof integrationTokens.$inferInsert;
 
 /* ----------------------------------------------------------------------------
+ * Vault folders — V.1
+ *
+ * Introduces a folder concept as the top-level container for vault content.
+ * Every photo / note / journal entry belongs to exactly one folder via a
+ * `folder_id` foreign key. Folders can be flipped public with `is_public`,
+ * which controls whether they appear on the public /vault page and whether
+ * /vault/[slug] serves the folder's contents to non-admins.
+ *
+ * Slugs are used as URL segments (`/vault/climbing-2025`). A short list of
+ * reserved slugs (admin, api, login, home) is enforced at the validation
+ * layer to avoid path collisions.
+ * ------------------------------------------------------------------------- */
+export const vaultFolders = pgTable("vault_folders", {
+  id: serial("id").primaryKey(),
+  slug: varchar("slug", { length: 120 }).notNull().unique(),
+  name: varchar("name", { length: 200 }).notNull(),
+  description: text("description").notNull().default(""),
+  isPublic: boolean("is_public").notNull().default(false),
+  sortOrder: integer("sort_order").notNull().default(0),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
+export type VaultFolder = typeof vaultFolders.$inferSelect;
+export type NewVaultFolder = typeof vaultFolders.$inferInsert;
+
+/* ----------------------------------------------------------------------------
  * Vault photos
  *
  * Stores photos uploaded via /admin/vault. The `filename` is what appears
  * in the terminal (e.g. "joshua-tree.jpg") — it's used as the argument to
  * `cat`. The `url` is the Vercel Blob public URL. `takenAt` is a freeform
  * string (e.g. "nov 2025") displayed as metadata in the terminal and gallery.
+ *
+ * V.1: gained `folder_id` FK. Nullable in the migration so it can be
+ * backfilled without downtime; flipped to NOT NULL in V.2 after we're sure
+ * every row got a folder assignment.
  * ------------------------------------------------------------------------- */
 export const vaultPhotos = pgTable("vault_photos", {
   id: serial("id").primaryKey(),
+  folderId: integer("folder_id").references(() => vaultFolders.id, {
+    onDelete: "restrict",
+  }),
   filename: varchar("filename", { length: 255 }).notNull(),
   url: text("url").notNull(),
   caption: text("caption").notNull().default(""),
@@ -199,6 +237,9 @@ export type NewVaultPhoto = typeof vaultPhotos.$inferInsert;
  * ------------------------------------------------------------------------- */
 export const vaultNotes = pgTable("vault_notes", {
   id: serial("id").primaryKey(),
+  folderId: integer("folder_id").references(() => vaultFolders.id, {
+    onDelete: "restrict",
+  }),
   slug: varchar("slug", { length: 255 }).notNull(),
   content: text("content").notNull(),
   displayDate: varchar("display_date", { length: 100 }),
@@ -223,6 +264,9 @@ export type NewVaultNote = typeof vaultNotes.$inferInsert;
  * ------------------------------------------------------------------------- */
 export const vaultJournal = pgTable("vault_journal", {
   id: serial("id").primaryKey(),
+  folderId: integer("folder_id").references(() => vaultFolders.id, {
+    onDelete: "restrict",
+  }),
   entryDate: varchar("entry_date", { length: 100 }).notNull(),
   content: text("content").notNull(),
   createdAt: timestamp("created_at", { withTimezone: true })
