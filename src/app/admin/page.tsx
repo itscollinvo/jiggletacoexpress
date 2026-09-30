@@ -66,21 +66,8 @@ export default async function AdminDashboardPage() {
             </p>
           </Link>
 
-          <Link
-            href="/admin/vault"
-            className="rounded-3xl border border-border p-6 transition-colors hover:border-accent-coral hover:bg-foreground/3"
-          >
-            <p className="text-sm uppercase tracking-[0.2em] text-accent-gold">
-              Vault
-            </p>
-            <h2 className="mt-3 text-xl font-semibold text-foreground">
-              Private archive
-            </h2>
-            <p className="mt-3 text-sm leading-6 text-foreground/70">
-              Upload photos, write notes, and manage journal entries for the
-              vault.
-            </p>
-          </Link>
+          {/* Vault admin surface removed in V.2 — all vault editing now
+            * happens through the terminal at /vault/home. See VAULT_PLAN.md. */}
 
           <Link
             href="/admin/integrations"

@@ -9,6 +9,8 @@
  */
 
 import type { Metadata } from "next";
+import { redirect } from "next/navigation";
+import { getCurrentUser } from "@/lib/auth/auth";
 
 export const metadata: Metadata = {
   title: "vault",
@@ -21,6 +23,14 @@ interface Props {
 }
 
 export default async function VaultGate({ searchParams }: Props) {
+  // V.2 — Admin bypass. If the admin session cookie is set, skip the code
+  // entry and go straight to /vault/home. The gate is still enforced for
+  // everyone else (via the vault-session cookie set on /api/vault/unlock).
+  const adminUser = await getCurrentUser();
+  if (adminUser) {
+    redirect("/vault/home");
+  }
+
   const { error } = await searchParams;
   const hasError = error === "1";
 
