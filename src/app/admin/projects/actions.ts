@@ -128,6 +128,9 @@ export async function createProjectAction(
     imageUrl: uploadedImageUrl ?? formData.get("imageUrl"),
     featured: formData.get("featured"),
     displayOrder: formData.get("displayOrder"),
+    techStack: formData.get("techStack"),
+    status: formData.get("status"),
+    demoUrl: formData.get("demoUrl"),
   });
 
   if (!parsed.success) {
@@ -185,6 +188,9 @@ export async function updateProjectAction(
     imageUrl: uploadedImageUrl ?? formData.get("imageUrl"),
     featured: formData.get("featured"),
     displayOrder: formData.get("displayOrder"),
+    techStack: formData.get("techStack"),
+    status: formData.get("status"),
+    demoUrl: formData.get("demoUrl"),
   });
 
   if (!parsed.success) {

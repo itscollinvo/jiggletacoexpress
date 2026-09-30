@@ -15,6 +15,27 @@
 
 import { z } from "zod";
 
+/**
+ * Shared: split a CSV string on commas, trim each piece, drop empties.
+ * Same helper the blog uses for tags — kept inline here to avoid a
+ * cross-module import for a five-line function.
+ */
+function splitCsv(input: unknown): string[] {
+  if (typeof input !== "string") return [];
+  return input
+    .split(",")
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0);
+}
+
+/**
+ * Allowed status values. Adding new ones is a matter of extending this
+ * tuple; no DB migration required because the schema column is a plain
+ * varchar (see schema.ts note).
+ */
+export const PROJECT_STATUSES = ["active", "wip", "archived"] as const;
+export type ProjectStatus = (typeof PROJECT_STATUSES)[number];
+
 export const ProjectInputSchema = z.object({
   title: z
     .string()
@@ -47,6 +68,25 @@ export const ProjectInputSchema = z.object({
     .int("Display order must be a whole number")
     .nonnegative("Display order can't be negative")
     .default(0),
+
+  // Tech stack arrives from the form as a CSV string (the chip input
+  // serializes to a hidden input). We preprocess into string[] before
+  // validating each entry's length. No requirement to have any — an
+  // empty array is a legit value.
+  techStack: z.preprocess(
+    (v) => (Array.isArray(v) ? v : splitCsv(v)),
+    z.array(z.string().min(1).max(50)).max(20).default([]),
+  ),
+
+  // Status must be one of PROJECT_STATUSES. Zod's `.enum()` gives a
+  // helpful error message listing the allowed values if someone tries
+  // to POST a bogus value.
+  status: z.enum(PROJECT_STATUSES).default("active"),
+
+  // Optional live demo URL. Same "" | URL union as githubUrl/imageUrl.
+  demoUrl: z
+    .union([z.literal(""), z.string().url("Must be a valid URL")])
+    .optional(),
 });
 
 export type ProjectInput = z.infer<typeof ProjectInputSchema>;
@@ -59,9 +99,15 @@ export function toDbInput(input: ProjectInput) {
   return {
     title: input.title,
     description: input.description,
-    githubUrl: input.githubUrl && input.githubUrl.length > 0 ? input.githubUrl : null,
-    imageUrl: input.imageUrl && input.imageUrl.length > 0 ? input.imageUrl : null,
+    githubUrl:
+      input.githubUrl && input.githubUrl.length > 0 ? input.githubUrl : null,
+    imageUrl:
+      input.imageUrl && input.imageUrl.length > 0 ? input.imageUrl : null,
     featured: input.featured,
     displayOrder: input.displayOrder,
+    techStack: input.techStack,
+    status: input.status,
+    demoUrl:
+      input.demoUrl && input.demoUrl.length > 0 ? input.demoUrl : null,
   };
 }
