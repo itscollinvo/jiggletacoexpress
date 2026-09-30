@@ -19,6 +19,7 @@
 import Link from "next/link";
 import { GithubIcon } from "./BrandIcons";
 import { HoverLift } from "./motion/HoverLift";
+import { getEffectiveSlug } from "@/lib/util/project-slug";
 import type { Project } from "@/lib/db/schema";
 
 function ExternalLinkIcon({ className }: { className?: string }) {
@@ -41,9 +42,17 @@ function ExternalLinkIcon({ className }: { className?: string }) {
 }
 
 export function FeaturedProjectHero({ project }: { project: Project }) {
+  const slug = getEffectiveSlug(project);
   return (
     <HoverLift scale={1.008} className="h-full">
-      <article className="group grid h-full grid-cols-1 gap-0 overflow-hidden rounded-3xl border border-border bg-foreground/3 transition-colors hover:border-accent-coral lg:grid-cols-5">
+      <article className="group relative grid h-full grid-cols-1 gap-0 overflow-hidden rounded-3xl border border-border bg-foreground/3 transition-colors hover:border-accent-coral lg:grid-cols-5">
+        {/* Full-card overlay link — see ProjectCard for the linked-card
+          * pattern comment. Source/Live demo anchors below get z-20. */}
+        <Link
+          href={`/projects/${slug}`}
+          aria-label={project.title}
+          className="absolute inset-0 z-10 rounded-3xl focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-coral focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+        />
         {/* Image column — takes 2/5 of the horizontal space on lg+ */}
         <div className="relative aspect-video overflow-hidden bg-foreground/5 lg:col-span-2 lg:aspect-auto">
           {project.imageUrl ? (
@@ -97,7 +106,7 @@ export function FeaturedProjectHero({ project }: { project: Project }) {
           ) : null}
 
           {(project.githubUrl || project.demoUrl) && (
-            <div className="mt-auto flex flex-wrap gap-2 pt-2">
+            <div className="relative z-20 mt-auto flex flex-wrap gap-2 pt-2">
               {project.githubUrl && (
                 <Link
                   href={project.githubUrl}

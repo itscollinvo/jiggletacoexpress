@@ -56,6 +56,9 @@ export default async function EditProjectPage({ params }: PageProps) {
             techStack: project.techStack,
             status: project.status,
             demoUrl: project.demoUrl,
+            slug: project.slug,
+            longMarkdown: project.longMarkdown,
+            screenshots: project.screenshots,
           }}
         />
       </div>

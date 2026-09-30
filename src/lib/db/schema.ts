@@ -66,6 +66,25 @@ export const projects = pgTable("projects", {
   // projects only have source, no hosted demo.
   demoUrl: varchar("demo_url", { length: 500 }),
 
+  // R.3 additions — per-project detail pages ("case studies").
+
+  // URL slug for /projects/[slug]. Nullable so the migration doesn't
+  // need to synchronously backfill; server actions auto-generate one
+  // from the title on any save, and the getEffectiveSlug() helper
+  // falls back to slugify(title) at read time until the DB catches up.
+  // Unique index prevents two projects colliding on the same URL.
+  slug: varchar("slug", { length: 200 }).unique(),
+
+  // Long-form case-study body in markdown. Rendered by MarkdownRenderer
+  // (same component the blog uses) so we get GFM, syntax-highlighted
+  // code, PR embeds, images, everything. Empty string = "no case study
+  // yet, page shows just the summary + tech + links".
+  longMarkdown: text("long_markdown").notNull().default(""),
+
+  // Array of screenshot URLs (hosted in Vercel Blob under projects/*).
+  // Rendered as a simple grid on the detail page. Order-preserving.
+  screenshots: text("screenshots").array().notNull().default([]),
+
   // `withTimezone: true` stores `timestamptz` in Postgres — recommended over
   // plain `timestamp` because it normalizes to UTC and renders correctly
   // regardless of the server's locale. `defaultNow()` becomes `DEFAULT NOW()`

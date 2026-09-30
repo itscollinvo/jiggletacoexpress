@@ -87,6 +87,30 @@ export const ProjectInputSchema = z.object({
   demoUrl: z
     .union([z.literal(""), z.string().url("Must be a valid URL")])
     .optional(),
+
+  // R.3 fields — detail page content.
+
+  // Slug is optional at input time. If missing, actions.ts auto-generates
+  // from title. Pattern enforced when supplied: lowercase kebab-case only.
+  slug: z
+    .string()
+    .trim()
+    .max(200, "Slug must be 200 characters or fewer")
+    .regex(/^[a-z0-9-]*$/, "Slug must be lowercase letters, numbers, or hyphens")
+    .optional()
+    .default(""),
+
+  // Long-form markdown body for the case-study page. Empty is fine —
+  // detail page just shows the summary + tech + links when empty.
+  longMarkdown: z.string().default(""),
+
+  // Screenshots come in as CSV of URLs from the form (each entry added
+  // via the uploader appends to a hidden CSV input). Preprocess into
+  // string[] and validate each entry is a URL.
+  screenshots: z.preprocess(
+    (v) => (Array.isArray(v) ? v : splitCsv(v)),
+    z.array(z.string().url("Each screenshot must be a valid URL")).max(20).default([]),
+  ),
 });
 
 export type ProjectInput = z.infer<typeof ProjectInputSchema>;
@@ -109,5 +133,12 @@ export function toDbInput(input: ProjectInput) {
     status: input.status,
     demoUrl:
       input.demoUrl && input.demoUrl.length > 0 ? input.demoUrl : null,
+    // Slug: caller in actions.ts fills in from slugify(title) when the
+    // form value is empty. We keep the null vs empty-string distinction
+    // by mapping "" → null so unique-index collisions can't happen
+    // between multiple untitled draft projects.
+    slug: input.slug && input.slug.length > 0 ? input.slug : null,
+    longMarkdown: input.longMarkdown,
+    screenshots: input.screenshots,
   };
 }

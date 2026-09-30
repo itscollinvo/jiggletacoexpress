@@ -52,6 +52,35 @@ export async function getProjectsSplit(featuredLimit = 2) {
   return { featured, rest };
 }
 
+/**
+ * Look up a project by URL slug. Two-tier lookup: first try an exact match
+ * on the `slug` column (fast, uses the unique index), then fall back to
+ * scanning all projects for one whose title slugifies to the requested
+ * value (slow but only hits for projects that haven't been re-saved yet
+ * post-R.3 migration).
+ *
+ * Returns null if no match — the caller (e.g. /projects/[slug]/page.tsx)
+ * calls notFound() when this returns null.
+ */
+export async function getProjectBySlug(slug: string) {
+  const db = getDb();
+
+  // Fast path — indexed lookup on the DB slug.
+  const [byDbSlug] = await db
+    .select()
+    .from(projects)
+    .where(eq(projects.slug, slug))
+    .limit(1);
+  if (byDbSlug) return byDbSlug;
+
+  // Fallback — no direct match. Load all projects (small dataset) and
+  // check if any un-slugged row's title slugifies to the requested value.
+  // This lets existing rows resolve without a data migration.
+  const { slugify } = await import("@/lib/util/project-slug");
+  const all = await getAllProjects();
+  return all.find((p) => !p.slug && slugify(p.title) === slug) ?? null;
+}
+
 export async function getProjectById(id: number) {
   const db = getDb();
   const [project] = await db
