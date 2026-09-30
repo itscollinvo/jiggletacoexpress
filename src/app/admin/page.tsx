@@ -113,6 +113,22 @@ export default async function AdminDashboardPage() {
               until you publish.
             </p>
           </Link>
+
+          <Link
+            href="/admin/about"
+            className="rounded-3xl border border-border p-6 transition-colors hover:border-accent-coral hover:bg-foreground/3"
+          >
+            <p className="text-sm uppercase tracking-[0.2em] text-accent-gold">
+              About
+            </p>
+            <h2 className="mt-3 text-xl font-semibold text-foreground">
+              Now, timeline, photos
+            </h2>
+            <p className="mt-3 text-sm leading-6 text-foreground/70">
+              Edit the three DB-backed sections on /about — what you&apos;re up
+              to right now, timeline milestones, and hobby photos.
+            </p>
+          </Link>
         </div>
       </div>
     </div>

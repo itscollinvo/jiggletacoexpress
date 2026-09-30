@@ -285,3 +285,78 @@ export type NewBlogPost = typeof blogPosts.$inferInsert;
 
 /** Narrow string union for status — helps components exhaust-check. */
 export type BlogPostStatus = "draft" | "published";
+
+/* ----------------------------------------------------------------------------
+ * About page — R.5
+ *
+ * Three tables backing the /about page's dynamic sections. The rest of the
+ * page (hero, personal narrative, values) is hardcoded in about/page.tsx
+ * because that content changes rarely and lives naturally in the code.
+ * These tables hold the parts that change often and benefit from a UI.
+ * ------------------------------------------------------------------------- */
+
+/**
+ * about_now — the "what I'm up to right now" section. Single row, upserted
+ * via /admin/about/now. Modeled as a keyed table (rather than a settings
+ * blob) so a second surface can be added later without schema churn.
+ */
+export const aboutNow = pgTable("about_now", {
+  id: serial("id").primaryKey(),
+  // A stable slug so we can address rows by name rather than id. For now
+  // there's only one row (slug "current") but this leaves room for
+  // "reading", "playing", etc. as separate feeds later.
+  slug: varchar("slug", { length: 40 }).notNull().unique(),
+  content: text("content").notNull().default(""),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
+export type AboutNow = typeof aboutNow.$inferSelect;
+export type NewAboutNow = typeof aboutNow.$inferInsert;
+
+/**
+ * timeline_entries — the personal/professional timeline shown on /about.
+ * Each entry: a period label (freeform string like "2023" or "Summer 2024"),
+ * a title, a description, an optional lucide icon name, and a sort order.
+ *
+ * `year` is text (not int) so entries like "Summer 2024" or "Spring 2020"
+ * work naturally. Sort order controls display; timelines don't need to
+ * match chronological order (e.g. "present" at top).
+ */
+export const timelineEntries = pgTable("timeline_entries", {
+  id: serial("id").primaryKey(),
+  year: varchar("year", { length: 80 }).notNull(),
+  title: varchar("title", { length: 200 }).notNull(),
+  description: text("description").notNull().default(""),
+  // Optional lucide-react icon name (e.g. "GraduationCap", "Code"). Rendered
+  // as a small marker next to the year. Nullable — plain year works too.
+  icon: varchar("icon", { length: 60 }),
+  sortOrder: integer("sort_order").notNull().default(0),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
+export type TimelineEntry = typeof timelineEntries.$inferSelect;
+export type NewTimelineEntry = typeof timelineEntries.$inferInsert;
+
+/**
+ * about_photos — hobby photos rendered in a grid at the bottom of /about.
+ * Blob URLs stored here, uploaded through /admin/about/photos.
+ */
+export const aboutPhotos = pgTable("about_photos", {
+  id: serial("id").primaryKey(),
+  url: varchar("url", { length: 500 }).notNull(),
+  caption: varchar("caption", { length: 200 }),
+  sortOrder: integer("sort_order").notNull().default(0),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
+export type AboutPhoto = typeof aboutPhotos.$inferSelect;
+export type NewAboutPhoto = typeof aboutPhotos.$inferInsert;
