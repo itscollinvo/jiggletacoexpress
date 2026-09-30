@@ -247,7 +247,7 @@ export function ProjectForm({ action, defaults, submitLabel }: Props) {
             ))}
           </select>
           <span className="text-xs text-foreground/60">
-            Shown as a badge on the card ("active" gets no badge).
+            Shown as a badge on the card (&quot;active&quot; gets no badge).
           </span>
           {fieldErrors?.status ? (
             <span className="block text-xs text-accent-coral">
