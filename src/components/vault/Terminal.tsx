@@ -1,26 +1,14 @@
 "use client";
 
 /**
- * Vault terminal — V.2.
+ * Vault terminal — V.3.
  *
- * Path model (see src/lib/vault/filesystem.ts):
- *   ~                     root, shows folders
- *   ~/<folder>            inside a folder, shows notes/ photos/ journal/
- *   ~/<folder>/<kind>     inside a kind dir, shows files
- *
- * Auth model:
- *   `initiallyAuthed` prop tells us if the visitor already has an admin
- *   session cookie. `admin login` runs a client-driven multi-step prompt
- *   that hits /api/auth/login and /api/auth/2fa/verify — same endpoints
- *   the /admin/login form uses. On success we set `isAdmin` and unlock
- *   write commands (mkdir, rmdir, touch, rm).
- *
- * Input modes:
- *   normal  — regular command entry
- *   email   — waiting for email input (part of admin login flow)
- *   password— waiting for password (masked)
- *   twofa   — waiting for TOTP code
- *   confirm — waiting for "yes"/"no" (rm confirmation)
+ * Changes from V.2:
+ *   - Path model is now an arbitrary tree (Cwd = string[])
+ *   - `ls` shows sub-folders AND files mixed together
+ *   - Hidden folders/files render in red for guests; cat refuses to open them
+ *   - Prompt user is "guest" when logged out, "Jyrinx" when logged in
+ *   - Legacy /general keeps notes/ photos/ journal/ sub-dirs
  */
 
 import {
@@ -34,12 +22,13 @@ import { useRouter } from "next/navigation";
 import {
   KINDS,
   ROOT_CWD,
+  LEGACY_GENERAL_SLUG,
   formatPromptPath,
   resolvePath,
-  getFolder,
-  getFilesInKind,
+  walkTree,
+  filesInCwd,
+  isLegacyKindPath,
   type Cwd,
-  type FileKind,
   type VaultData,
   type VaultFile,
 } from "@/lib/vault/filesystem";
@@ -61,7 +50,14 @@ type LineType =
   | "file"
   | "error"
   | "ok"
+  | "listing"
   | "empty";
+
+interface ListingItem {
+  label: string;
+  isDir: boolean;
+  hidden: boolean;
+}
 
 interface OutputLine {
   id: number;
@@ -69,7 +65,7 @@ interface OutputLine {
   text: string;
   promptPath?: string;
   file?: VaultFile;
-  /** For prompt lines, whether the input was masked (e.g. password). */
+  items?: ListingItem[];
   masked?: boolean;
 }
 
@@ -80,8 +76,6 @@ type InputMode =
   | { kind: "twofa"; email: string }
   | { kind: "confirm"; onConfirm: () => Promise<void> | void };
 
-// ── Line factory ────────────────────────────────────────────────────────────
-
 let _id = 0;
 function mkLine(
   type: LineType,
@@ -91,13 +85,13 @@ function mkLine(
   return { id: _id++, type, text, ...extras };
 }
 
-// ── Component ────────────────────────────────────────────────────────────────
-
 interface Props {
   vaultData: VaultData;
   initiallyAuthed: boolean;
   adminEmail: string | null;
 }
+
+const ADMIN_USERNAME = "Jyrinx";
 
 export function VaultTerminal({
   vaultData,
@@ -123,7 +117,6 @@ export function VaultTerminal({
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [lines]);
 
-  /** Push output lines after echoing the prompt/input line. */
   const push = useCallback(
     (promptLine: OutputLine | null, output: OutputLine[]) => {
       setLines((prev) => [
@@ -138,26 +131,18 @@ export function VaultTerminal({
   const submit = useCallback(async () => {
     const raw = input;
     const trimmed = raw.trim();
-
-    // Echo. Masked modes render bullets instead of the actual text so
-    // over-shoulder viewers don't see passwords.
-    const echo = mode.kind === "password"
-      ? "•".repeat(raw.length)
-      : trimmed;
-    const promptLabel = getPromptLabel(mode, cwd, currentEmail);
+    const echo = mode.kind === "password" ? "•".repeat(raw.length) : trimmed;
+    const promptLabel = getPromptLabel(mode, cwd, isAdmin);
     const promptLine = mkLine("prompt", echo, {
       promptPath: promptLabel,
       masked: mode.kind === "password",
     });
-
     setInput("");
 
-    // Mode-dispatched handling.
+    // Multi-step auth
     if (mode.kind === "email") {
       if (!trimmed) {
-        push(promptLine, [
-          mkLine("error", "email required. login cancelled."),
-        ]);
+        push(promptLine, [mkLine("error", "email required. login cancelled.")]);
         setMode({ kind: "normal" });
         return;
       }
@@ -165,12 +150,9 @@ export function VaultTerminal({
       setMode({ kind: "password", email: trimmed });
       return;
     }
-
     if (mode.kind === "password") {
       if (!raw) {
-        push(promptLine, [
-          mkLine("error", "password required. login cancelled."),
-        ]);
+        push(promptLine, [mkLine("error", "password required. login cancelled.")]);
         setMode({ kind: "normal" });
         return;
       }
@@ -191,7 +173,6 @@ export function VaultTerminal({
         setMode({ kind: "twofa", email: mode.email });
         return;
       }
-      // success
       push(null, [mkLine("ok", `signed in as ${mode.email}`)]);
       setIsAdmin(true);
       setCurrentEmail(mode.email);
@@ -199,10 +180,9 @@ export function VaultTerminal({
       router.refresh();
       return;
     }
-
     if (mode.kind === "twofa") {
       if (!trimmed) {
-        push(promptLine, [mkLine("error", "code required. login cancelled.")]);
+        push(promptLine, [mkLine("error", "code required.")]);
         setMode({ kind: "normal" });
         return;
       }
@@ -220,7 +200,6 @@ export function VaultTerminal({
       router.refresh();
       return;
     }
-
     if (mode.kind === "confirm") {
       push(promptLine, []);
       if (trimmed.toLowerCase() === "yes" || trimmed.toLowerCase() === "y") {
@@ -232,7 +211,7 @@ export function VaultTerminal({
       return;
     }
 
-    // Normal command mode.
+    // Normal mode
     if (!trimmed) {
       push(promptLine, []);
       return;
@@ -244,7 +223,6 @@ export function VaultTerminal({
     const [head, ...rest] = trimmed.split(/\s+/);
     const arg = rest.join(" ");
 
-    // Auth commands
     if (head === "admin") {
       const sub = rest[0];
       if (sub === "login") {
@@ -259,29 +237,24 @@ export function VaultTerminal({
           setCurrentEmail(null);
           push(null, [mkLine("ok", "signed out.")]);
           router.refresh();
-        } else {
-          push(null, [mkLine("error", "logout failed")]);
-        }
+        } else push(null, [mkLine("error", "logout failed")]);
         return;
       }
       if (sub === "whoami") {
         push(null, [
           mkLine("output", isAdmin
-            ? `${currentEmail ?? "admin"} (authenticated)`
-            : "not logged in"),
+            ? `${currentEmail ?? ADMIN_USERNAME} (authenticated)`
+            : "not logged in (guest)"),
         ]);
         return;
       }
-      push(null, [
-        mkLine("error", `admin: unknown subcommand '${sub ?? ""}' — try admin login/logout/whoami`),
-      ]);
+      push(null, [mkLine("error", `admin: unknown '${sub ?? ""}'`)]);
       return;
     }
 
-    // Read-only commands
     if (head === "help") return push(null, helpLines(isAdmin));
     if (head === "pwd")
-      return push(null, [mkLine("output", `/home/collin/vault/${formatPromptPath(cwd)}`)]);
+      return push(null, [mkLine("output", `/vault/${formatPromptPath(cwd)}`)]);
     if (head === "clear") {
       setLines([]);
       return;
@@ -292,21 +265,21 @@ export function VaultTerminal({
     }
 
     if (head === "ls") {
-      push(null, cmdLs(arg, cwd, vaultData));
+      push(null, cmdLs(arg, cwd, vaultData, isAdmin));
       return;
     }
     if (head === "cd") {
-      const result = cmdCd(arg, cwd, vaultData);
+      const result = cmdCd(arg, cwd, vaultData, isAdmin);
       if (result.error) push(null, [mkLine("error", result.error)]);
       else setCwd(result.cwd);
       return;
     }
     if (head === "cat") {
-      push(null, cmdCat(arg, cwd, vaultData));
+      push(null, cmdCat(arg, cwd, vaultData, isAdmin));
       return;
     }
 
-    // Admin-only write commands
+    // Write commands
     const writeCmds = new Set(["mkdir", "rmdir", "touch", "rm"]);
     if (writeCmds.has(head!)) {
       if (!isAdmin) {
@@ -316,54 +289,35 @@ export function VaultTerminal({
         return;
       }
       if (head === "mkdir") {
-        const r = await mkdirAction(arg);
+        const r = await mkdirAction({ cwd, arg });
         push(null, [renderCmdResult(r)]);
         if (r.ok) router.refresh();
         return;
       }
       if (head === "rmdir") {
-        const r = await rmdirAction(arg);
+        const r = await rmdirAction({ cwd, arg });
         push(null, [renderCmdResult(r)]);
         if (r.ok) router.refresh();
         return;
       }
       if (head === "touch") {
-        if (!cwd.folder || !cwd.kind) {
-          push(null, [
-            mkLine("error", "touch: cd into a folder/kind first (e.g. cd general/notes)"),
-          ]);
-          return;
-        }
-        const r = await touchAction({
-          folderSlug: cwd.folder,
-          kind: cwd.kind,
-          name: arg,
-        });
+        const r = await touchAction({ cwd, arg });
         push(null, [renderCmdResult(r)]);
         if (r.ok) router.refresh();
         return;
       }
       if (head === "rm") {
-        if (!cwd.folder || !cwd.kind) {
-          push(null, [
-            mkLine("error", "rm: cd into a folder/kind first"),
-          ]);
-          return;
-        }
-        const folderSlug = cwd.folder;
-        const kind = cwd.kind;
+        const localCwd = cwd;
         const name = arg;
         setMode({
           kind: "confirm",
           onConfirm: async () => {
-            const r = await rmAction({ folderSlug, kind, name });
+            const r = await rmAction({ cwd: localCwd, arg: name });
             push(null, [renderCmdResult(r)]);
             if (r.ok) router.refresh();
           },
         });
-        push(null, [
-          mkLine("output", `delete '${name}'? type 'yes' to confirm.`),
-        ]);
+        push(null, [mkLine("output", `delete '${name}'? type 'yes' to confirm.`)]);
         return;
       }
     }
@@ -377,7 +331,7 @@ export function VaultTerminal({
         void submit();
         return;
       }
-      if (mode.kind !== "normal") return; // history only in normal mode
+      if (mode.kind !== "normal") return;
       if (e.key === "ArrowUp") {
         e.preventDefault();
         setHistoryIdx((idx) => {
@@ -397,7 +351,7 @@ export function VaultTerminal({
     [submit, cmdHistory, mode],
   );
 
-  const promptLabel = getPromptLabel(mode, cwd, currentEmail);
+  const promptLabel = getPromptLabel(mode, cwd, isAdmin);
   const inputType = mode.kind === "password" ? "password" : "text";
 
   return (
@@ -447,89 +401,131 @@ export function VaultTerminal({
   );
 }
 
-// ── Prompt label ─────────────────────────────────────────────────────────────
+// ── Prompt ───────────────────────────────────────────────────────────────────
 
-function getPromptLabel(mode: InputMode, cwd: Cwd, email: string | null): string {
+function getPromptLabel(mode: InputMode, cwd: Cwd, isAdmin: boolean): string {
   if (mode.kind === "email") return "email:";
   if (mode.kind === "password") return "password:";
   if (mode.kind === "twofa") return "2fa code:";
   if (mode.kind === "confirm") return "confirm:";
-  const who = email ? `${email.split("@")[0]}` : "collin";
-  return `${who}@vault:${formatPromptPath(cwd)}$`;
+  const user = isAdmin ? ADMIN_USERNAME : "guest";
+  return `${user}@vault:${formatPromptPath(cwd)}$`;
 }
 
-// ── Command implementations ──────────────────────────────────────────────────
+// ── ls ───────────────────────────────────────────────────────────────────────
 
-function cmdLs(arg: string, cwd: Cwd, data: VaultData): OutputLine[] {
+function cmdLs(
+  arg: string,
+  cwd: Cwd,
+  data: VaultData,
+  isAdmin: boolean,
+): OutputLine[] {
   const target = arg ? resolvePath(arg, cwd, data) : cwd;
   if (!target) return [mkLine("error", `ls: ${arg}: no such directory`)];
 
-  if (!target.folder) {
-    // Root — list folders
-    if (data.folders.length === 0) return [mkLine("output", "(no folders)")];
-    return [mkLine("output", data.folders.map((f) => `${f.slug}/`).join("  "))];
-  }
-  const folder = getFolder(target.folder, data);
-  if (!folder) return [mkLine("error", `ls: ${target.folder}: not found`)];
+  const items: ListingItem[] = [];
 
-  if (!target.kind) {
-    // In a folder — list kind dirs
-    return [mkLine("output", KINDS.map((k) => `${k}/`).join("  "))];
+  // Case A: root — list top-level folders
+  if (target.length === 0) {
+    for (const node of data.roots) {
+      const hidden = !node.isPublic;
+      if (hidden && !isAdmin) {
+        items.push({ label: `${node.slug}/`, isDir: true, hidden: true });
+      } else if (!hidden || isAdmin) {
+        items.push({ label: `${node.slug}/`, isDir: true, hidden: !node.isPublic });
+      }
+    }
+    if (items.length === 0) return [mkLine("output", "(no folders)")];
+    return [mkLine("listing", "", { items })];
   }
-  const files = getFilesInKind(folder, target.kind);
-  if (files.length === 0) return [mkLine("output", "(empty)")];
-  return [mkLine("output", files.map((f) => f.name).join("  "))];
+
+  // Case B: legacy general root — show 3 kind sub-dirs
+  if (target.length === 1 && target[0] === LEGACY_GENERAL_SLUG) {
+    const node = walkTree(data, target);
+    if (!node) return [mkLine("error", `ls: ${arg}: not found`)];
+    for (const k of KINDS) {
+      items.push({ label: `${k}/`, isDir: true, hidden: false });
+    }
+    // Also list any child folders (nested under /general)
+    for (const child of node.children) {
+      items.push({
+        label: `${child.slug}/`,
+        isDir: true,
+        hidden: !child.isPublic,
+      });
+    }
+    return [mkLine("listing", "", { items })];
+  }
+
+  // Case C: legacy general kind sub-dir — show files of that kind
+  const legacy = isLegacyKindPath(target);
+  if (legacy) {
+    const files = filesInCwd(target, data);
+    for (const f of files) {
+      items.push({ label: f.name, isDir: false, hidden: !f.isPublic });
+    }
+    if (items.length === 0) return [mkLine("output", "(empty)")];
+    return [mkLine("listing", "", { items })];
+  }
+
+  // Case D: normal folder — show sub-folders + files mixed
+  const node = walkTree(data, target);
+  if (!node) return [mkLine("error", `ls: ${arg}: not found`)];
+  for (const child of node.children) {
+    items.push({
+      label: `${child.slug}/`,
+      isDir: true,
+      hidden: !child.isPublic,
+    });
+  }
+  for (const f of node.files) {
+    items.push({ label: f.name, isDir: false, hidden: !f.isPublic });
+  }
+  if (items.length === 0) return [mkLine("output", "(empty)")];
+  return [mkLine("listing", "", { items })];
 }
+
+// ── cd ───────────────────────────────────────────────────────────────────────
 
 function cmdCd(
   arg: string,
   cwd: Cwd,
   data: VaultData,
+  isAdmin: boolean,
 ): { cwd: Cwd; error?: string } {
   if (!arg || arg === "~" || arg === "/") return { cwd: ROOT_CWD };
   const target = resolvePath(arg, cwd, data);
   if (!target) return { cwd, error: `cd: ${arg}: no such directory` };
+
+  // Enforce hidden-folder gate for guests. Legacy kind sub-dirs inherit
+  // /general's visibility (which is always true post-migration), so no
+  // extra check needed there.
+  if (!isAdmin && target.length > 0) {
+    const node = walkTree(data, target);
+    if (node && !node.isPublic) {
+      return { cwd, error: `cd: ${arg}: permission denied` };
+    }
+  }
   return { cwd: target };
 }
 
-function cmdCat(arg: string, cwd: Cwd, data: VaultData): OutputLine[] {
+// ── cat ──────────────────────────────────────────────────────────────────────
+
+function cmdCat(
+  arg: string,
+  cwd: Cwd,
+  data: VaultData,
+  isAdmin: boolean,
+): OutputLine[] {
   if (!arg) return [mkLine("error", "cat: missing filename")];
 
-  // Two shapes: `cat file.md` while in a kind dir, or `cat folder/kind/file.md`.
-  let folderSlug = cwd.folder;
-  let kind = cwd.kind;
-  let fileName = arg;
-  if (arg.includes("/")) {
-    const parts = arg.split("/").filter(Boolean);
-    if (parts.length === 3) {
-      folderSlug = parts[0]!;
-      if (!(KINDS as string[]).includes(parts[1]!)) {
-        return [mkLine("error", `cat: ${arg}: invalid path`)];
-      }
-      kind = parts[1] as FileKind;
-      fileName = parts[2]!;
-    } else if (parts.length === 2) {
-      // <kind>/<file> — assume we're already in a folder
-      if (!folderSlug) return [mkLine("error", `cat: ${arg}: cd into a folder first`)];
-      if (!(KINDS as string[]).includes(parts[0]!)) {
-        return [mkLine("error", `cat: ${arg}: invalid path`)];
-      }
-      kind = parts[0] as FileKind;
-      fileName = parts[1]!;
-    } else {
-      return [mkLine("error", `cat: ${arg}: invalid path`)];
-    }
+  const files = filesInCwd(cwd, data);
+  const file = files.find((f) => f.name === arg);
+  if (!file) return [mkLine("error", `cat: ${arg}: no such file`)];
+
+  if (!file.isPublic && !isAdmin) {
+    return [mkLine("error", `cat: ${arg}: permission denied`)];
   }
-
-  if (!folderSlug || !kind) {
-    return [mkLine("error", `cat: ${arg}: cd into a folder/kind first`)];
-  }
-
-  const folder = getFolder(folderSlug, data);
-  if (!folder) return [mkLine("error", `cat: ${folderSlug}: no such folder`)];
-
-  const file = getFilesInKind(folder, kind).find((f) => f.name === fileName);
-  if (!file) return [mkLine("error", `cat: ${fileName}: no such file`)];
 
   if (file.kind === "photos") {
     return [mkLine("photo", file.content, { file })];
@@ -537,7 +533,7 @@ function cmdCat(arg: string, cwd: Cwd, data: VaultData): OutputLine[] {
   return [mkLine("file", file.content, { file })];
 }
 
-// ── Client-side auth helpers ────────────────────────────────────────────────
+// ── auth helpers (unchanged from V.2) ────────────────────────────────────────
 
 async function doPasswordLogin(
   email: string,
@@ -552,8 +548,6 @@ async function doPasswordLogin(
   fd.append("email", email);
   fd.append("password", password);
   const res = await fetch("/api/auth/login", { method: "POST", body: fd });
-  // The API redirects: 303 → /admin (success) or 303 → /admin/login?error=...
-  // Fetch follows redirects; the final URL tells us the outcome.
   const finalUrl = new URL(res.url);
   if (finalUrl.pathname === "/admin") return { status: "success" };
   if (finalUrl.pathname === "/admin/login/2fa") return { status: "twofa-required" };
@@ -562,27 +556,25 @@ async function doPasswordLogin(
   return { status: "invalid" };
 }
 
-async function doTwoFaVerify(
-  code: string,
-): Promise<{ ok: true } | { ok: false; message: string }> {
+async function doTwoFaVerify(code: string) {
   const fd = new FormData();
   fd.append("code", code);
   const res = await fetch("/api/auth/2fa/verify", { method: "POST", body: fd });
   const finalUrl = new URL(res.url);
-  if (finalUrl.pathname === "/admin") return { ok: true };
+  if (finalUrl.pathname === "/admin") return { ok: true as const };
   const err = finalUrl.searchParams.get("error");
-  if (err === "rate-limited") return { ok: false, message: "rate limited." };
-  return { ok: false, message: "invalid code." };
+  if (err === "rate-limited") return { ok: false as const, message: "rate limited." };
+  return { ok: false as const, message: "invalid code." };
 }
 
-// ── Help + welcome ──────────────────────────────────────────────────────────
+// ── Welcome + help + result rendering ────────────────────────────────────────
 
 function helpLines(isAdmin: boolean): OutputLine[] {
   const base = [
     mkLine("output", "commands:"),
     mkLine("empty", ""),
-    mkLine("output", "  ls [path]         list folder or files"),
-    mkLine("output", "  cd <path>         change directory (folder, folder/kind, ..)"),
+    mkLine("output", "  ls [path]         list folder / files"),
+    mkLine("output", "  cd <path>         change directory (supports .. and paths)"),
     mkLine("output", "  cat <file>        read a file"),
     mkLine("output", "  pwd               current path"),
     mkLine("output", "  clear             clear terminal"),
@@ -591,15 +583,15 @@ function helpLines(isAdmin: boolean): OutputLine[] {
     mkLine("output", "auth:"),
     mkLine("output", "  admin login       sign in for write access"),
     mkLine("output", "  admin logout      sign out"),
-    mkLine("output", "  admin whoami      show current admin"),
+    mkLine("output", "  admin whoami      show current user"),
   ];
   if (isAdmin) {
     base.push(
       mkLine("empty", ""),
       mkLine("output", "admin commands:"),
-      mkLine("output", "  mkdir <slug>      create folder"),
-      mkLine("output", "  rmdir <slug>      delete empty folder"),
-      mkLine("output", "  touch <name>      new note/journal (in a kind dir)"),
+      mkLine("output", "  mkdir <name>      create folder (accepts a/b/c for nested)"),
+      mkLine("output", "  rmdir <name>      delete empty folder"),
+      mkLine("output", "  touch <name>      new file (note; YYYY-MM-DD.md → journal)"),
       mkLine("output", "  rm <name>         delete a file (with confirm)"),
     );
   }
@@ -615,7 +607,7 @@ function makeWelcome(
     mkLine("welcome", `last login: ${d.toDateString()}`),
     mkLine("empty", ""),
     mkLine("welcome", "collin's vault — private archive"),
-    mkLine("welcome", "type 'help' for available commands"),
+    mkLine("welcome", "type 'help' for commands"),
   ];
   if (initiallyAuthed && email) {
     lines.push(mkLine("welcome", `admin session active: ${email}`));
@@ -623,8 +615,6 @@ function makeWelcome(
   lines.push(mkLine("empty", ""));
   return lines;
 }
-
-// ── Result renderer ─────────────────────────────────────────────────────────
 
 function renderCmdResult(r: CmdResult): OutputLine {
   if (r.ok) return mkLine("ok", r.message ?? "ok");
@@ -653,16 +643,32 @@ function TerminalLine({ line: l }: { line: OutputLine }) {
     );
   }
 
-  if (l.type === "welcome") {
-    return <div style={{ color: "rgba(255,255,255,0.28)" }}>{l.text}</div>;
-  }
+  if (l.type === "welcome") return <div style={{ color: "rgba(255,255,255,0.28)" }}>{l.text}</div>;
+  if (l.type === "error") return <div style={{ color: "rgba(255,140,110,0.85)" }}>{l.text}</div>;
+  if (l.type === "ok") return <div style={{ color: "rgba(180,220,150,0.85)" }}>{l.text}</div>;
 
-  if (l.type === "error") {
-    return <div style={{ color: "rgba(255,140,110,0.85)" }}>{l.text}</div>;
-  }
-
-  if (l.type === "ok") {
-    return <div style={{ color: "rgba(180,220,150,0.85)" }}>{l.text}</div>;
+  if (l.type === "listing" && l.items) {
+    // Render each item inline, coloring hidden ones red. Two-space gap between items.
+    return (
+      <div style={{ color: "rgba(255,255,255,0.45)" }}>
+        {l.items.map((it, i) => (
+          <span key={i}>
+            {i > 0 && "  "}
+            <span
+              style={{
+                color: it.hidden
+                  ? "rgba(255,110,90,0.9)"
+                  : it.isDir
+                    ? "rgba(160,200,255,0.8)"
+                    : "rgba(255,255,255,0.55)",
+              }}
+            >
+              {it.label}
+            </span>
+          </span>
+        ))}
+      </div>
+    );
   }
 
   if (l.type === "photo" && l.file?.url) {
@@ -684,32 +690,6 @@ function TerminalLine({ line: l }: { line: OutputLine }) {
             alt={l.file.content}
             style={{ display: "block", width: "100%", borderRadius: "1px" }}
           />
-          {(l.file.content || l.file.createdAt) && (
-            <div style={{ marginTop: "10px", padding: "0 2px" }}>
-              {l.file.createdAt && (
-                <div
-                  style={{
-                    color: "rgba(255,255,255,0.25)",
-                    fontSize: "11px",
-                    marginBottom: "2px",
-                  }}
-                >
-                  {l.file.createdAt}
-                </div>
-              )}
-              {l.file.content && (
-                <div
-                  style={{
-                    color: "rgba(255,255,255,0.5)",
-                    fontSize: "12px",
-                    lineHeight: 1.5,
-                  }}
-                >
-                  {l.file.content}
-                </div>
-              )}
-            </div>
-          )}
         </div>
       </div>
     );
@@ -727,17 +707,6 @@ function TerminalLine({ line: l }: { line: OutputLine }) {
           lineHeight: 1.7,
         }}
       >
-        {l.file?.createdAt && (
-          <div
-            style={{
-              color: "rgba(255,255,255,0.22)",
-              fontSize: "11px",
-              marginBottom: "4px",
-            }}
-          >
-            {l.file.createdAt}
-          </div>
-        )}
         {l.text}
       </div>
     );

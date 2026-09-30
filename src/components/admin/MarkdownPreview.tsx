@@ -111,7 +111,6 @@ const components: Components = {
     </pre>
   ),
   hr: () => <hr className="my-8 border-border" />,
-  // eslint-disable-next-line @next/next/no-img-element
   img: ({ src, alt }) => (
     // eslint-disable-next-line @next/next/no-img-element
     <img
