@@ -64,6 +64,13 @@
       "when": 1790753167557,
       "tag": "0008_condemned_secret_warriors",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1790755098263,
+      "tag": "0009_wooden_masque",
+      "breakpoints": true
     }
   ]
 }
