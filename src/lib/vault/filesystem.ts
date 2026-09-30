@@ -1,14 +1,21 @@
 /**
- * Vault virtual filesystem — V.2 (folder-aware).
+ * Vault virtual filesystem — V.3.
  *
- * The path model has three levels:
- *   ~                     — root: shows folders
- *   ~/<folder>            — inside a folder: shows notes/ photos/ journal/
- *   ~/<folder>/<kind>     — inside a kind dir: shows individual files
+ * Path model is an arbitrary tree, like a real filesystem:
+ *   ~                       root, shows top-level folders
+ *   ~/climbing              a folder
+ *   ~/climbing/2025-summer  nested folder
+ *   ~/climbing/beta.md      a file inside a folder
  *
- * The terminal reads `VaultData` produced by /vault/home/page.tsx, then
- * navigates via the `Cwd` shape (folder + kind, both nullable). All writes
- * go through server actions in src/app/vault/actions.ts.
+ * Files come in three kinds (note / photo / journal) — each backed by its
+ * own DB table (vault_notes / vault_photos / vault_journal). At `ls` time
+ * the terminal sees a UNION of all three kinds in the current folder,
+ * displayed together like a regular filesystem. Kind is only visible in
+ * the file's metadata (icon color, cat rendering) — not as a subdirectory.
+ *
+ * Special-case legacy: the /general folder still shows the old
+ * `notes/ photos/ journal/` sub-dirs for backward compatibility with the
+ * pre-V.3 layout. New folders don't get sub-dirs.
  */
 
 export type FileKind = "notes" | "photos" | "journal";
@@ -16,9 +23,9 @@ export type FileKind = "notes" | "photos" | "journal";
 export const KINDS: FileKind[] = ["notes", "photos", "journal"];
 
 /**
- * Slugs the vault filesystem refuses to accept — reserved for routes
- * we own (/vault/home, /admin, etc.) or paths that would be confusing.
- * Enforced client-side (immediate feedback) AND server-side (defense).
+ * Slugs that a folder cannot be named. Enforced both client-side (fast
+ * feedback) and server-side (source of truth). Also includes the three
+ * kind names so a folder can't shadow the legacy /general sub-dirs.
  */
 export const RESERVED_FOLDER_SLUGS = new Set([
   "admin",
@@ -33,63 +40,94 @@ export const RESERVED_FOLDER_SLUGS = new Set([
   "journal",
 ]);
 
+/** Legacy folder that still exposes kind sub-dirs. */
+export const LEGACY_GENERAL_SLUG = "general";
+
 export interface VaultFile {
   name: string;
   kind: FileKind;
-  content: string; // caption / body text
-  url?: string; // Blob URL — photos only
+  content: string;
+  url?: string;
   createdAt?: string;
+  /** false = hidden from guests; shown in red on ls, cat refused. */
+  isPublic: boolean;
 }
 
-/**
- * A folder's contents, split by kind. Each key maps to the list of files
- * of that kind belonging to the folder.
- */
-export interface FolderContents {
+export interface FolderNode {
+  id: number;
+  parentId: number | null;
   slug: string;
   name: string;
   description: string;
-  notes: VaultFile[];
-  photos: VaultFile[];
-  journal: VaultFile[];
+  isPublic: boolean;
+  /** Direct child folders. */
+  children: FolderNode[];
+  /** Files in this folder (union of notes/photos/journal). */
+  files: VaultFile[];
 }
 
-/**
- * Root-level data — a list of folders each carrying its contents. Fetched
- * once on the server; the terminal doesn't fetch on its own.
- */
 export interface VaultData {
-  folders: FolderContents[];
+  /** Every folder in the DB, arranged as a tree rooted at these top-level
+   *  folders (parent_id NULL). Each node's files array holds only the files
+   *  directly in that folder — not descendants. */
+  roots: FolderNode[];
 }
 
 /* ----------------------------------------------------------------------------
  * Cwd model
+ *
+ * Represented as an array of slugs from root. `[]` = root. `["climbing"]` =
+ * inside "climbing". `["climbing", "2025"]` = nested.
+ *
+ * A special "legacy kind sub-dir" is represented by appending a kind slug
+ * to a path that ends at the general folder — e.g. ["general", "notes"].
+ * The resolvePath helper knows how to walk into and out of these.
  * ------------------------------------------------------------------------- */
 
-export interface Cwd {
-  folder: string | null; // slug, or null at root
-  kind: FileKind | null;
+export type Cwd = string[];
+export const ROOT_CWD: Cwd = [];
+
+/** ~ / ~/a / ~/a/b for the prompt. */
+export function formatPromptPath(cwd: Cwd): string {
+  if (cwd.length === 0) return "~";
+  return `~/${cwd.join("/")}`;
 }
 
-export const ROOT_CWD: Cwd = { folder: null, kind: null };
-
-/** Human-readable path for the prompt: ~, ~/climbing, ~/climbing/notes */
-export function formatPromptPath(cwd: Cwd): string {
-  if (!cwd.folder) return "~";
-  if (!cwd.kind) return `~/${cwd.folder}`;
-  return `~/${cwd.folder}/${cwd.kind}`;
+/** Walk from root to a target node using an array of slugs. */
+export function walkTree(data: VaultData, path: string[]): FolderNode | null {
+  if (path.length === 0) return null;
+  const [first, ...rest] = path;
+  const start = data.roots.find((r) => r.slug === first);
+  if (!start) return null;
+  let cur: FolderNode | undefined = start;
+  for (const slug of rest) {
+    cur = cur.children.find((c) => c.slug === slug);
+    if (!cur) return null;
+  }
+  return cur ?? null;
 }
 
 /**
- * Resolve a path string (relative to cwd) into a new Cwd.
- * Supported inputs:
- *   ~ / /               → root
- *   ..                  → parent
- *   <folder>            → into a folder (from root)
- *   <kind>              → into a kind (from inside a folder)
- *   <folder>/<kind>     → jump two levels (from root)
- *
- * Returns null if the path is invalid OR doesn't exist in `data`.
+ * Is this cwd inside the legacy /general folder's kind sub-dirs?
+ * i.e. ["general", "notes"|"photos"|"journal"].
+ */
+export function isLegacyKindPath(
+  cwd: Cwd,
+): { folderSlug: string; kind: FileKind } | null {
+  if (cwd.length === 2 && cwd[0] === LEGACY_GENERAL_SLUG) {
+    const kind = cwd[1] as FileKind;
+    if ((KINDS as string[]).includes(kind)) {
+      return { folderSlug: cwd[0]!, kind };
+    }
+  }
+  return null;
+}
+
+/**
+ * Resolve a path string (relative or absolute) to a new Cwd. Returns null
+ * if the target doesn't exist. Handles `~`, `/`, `..`, single-name, and
+ * multi-segment paths. Legacy kind sub-dirs under /general are also
+ * resolvable (e.g. `cd notes` while in ~/general).
  */
 export function resolvePath(
   input: string,
@@ -98,58 +136,55 @@ export function resolvePath(
 ): Cwd | null {
   const raw = input.trim();
   if (!raw) return cwd;
-
-  // Absolute forms first.
   if (raw === "~" || raw === "/" || raw === "~/") return ROOT_CWD;
-  if (raw === "..") {
-    if (cwd.kind) return { folder: cwd.folder, kind: null };
-    if (cwd.folder) return ROOT_CWD;
-    return null;
-  }
 
-  // Strip leading ~ or /.
-  const normalized = raw.replace(/^~\//, "").replace(/^\//, "");
-  const parts = normalized.split("/").filter(Boolean);
-  if (parts.length === 0) return ROOT_CWD;
+  // Break into parts, keep .. handling
+  const parts = raw.replace(/^~\//, "").replace(/^\//, "").split("/").filter(Boolean);
 
-  // Resolution depends on where we are.
-  if (cwd.kind) {
-    // Inside a kind, only ".." makes sense (handled above). Anything else
-    // is an error — the terminal doesn't have sub-kind dirs.
-    return null;
-  }
+  // Start from cwd (relative) unless the input begins with ~ or / (absolute).
+  const start: Cwd = raw.startsWith("~") || raw.startsWith("/") ? [] : [...cwd];
 
-  if (cwd.folder) {
-    // Inside a folder, accept a single kind.
-    if (parts.length === 1 && (KINDS as string[]).includes(parts[0]!)) {
-      return { folder: cwd.folder, kind: parts[0] as FileKind };
+  for (const p of parts) {
+    if (p === ".") continue;
+    if (p === "..") {
+      if (start.length === 0) return null;
+      start.pop();
+      continue;
     }
-    return null;
+    // Legacy support: inside /general (start === ["general"]), accept
+    // "notes"/"photos"/"journal" as pseudo-subdirs.
+    if (
+      start.length === 1 &&
+      start[0] === LEGACY_GENERAL_SLUG &&
+      (KINDS as string[]).includes(p)
+    ) {
+      start.push(p);
+      continue;
+    }
+    // Normal case: walk into a child folder.
+    const node = walkTree(data, [...start, p]);
+    if (!node) return null;
+    start.push(p);
   }
 
-  // At root: accept <folder> or <folder>/<kind>.
-  const folderSlug = parts[0]!;
-  const folder = data.folders.find((f) => f.slug === folderSlug);
-  if (!folder) return null;
-  if (parts.length === 1) return { folder: folderSlug, kind: null };
-  if (parts.length === 2 && (KINDS as string[]).includes(parts[1]!)) {
-    return { folder: folderSlug, kind: parts[1] as FileKind };
+  return start;
+}
+
+/** Visible slug for display; guests skip hidden folders on regular ls. */
+export function folderChildren(node: FolderNode | null, data: VaultData): FolderNode[] {
+  return node ? node.children : data.roots;
+}
+
+/** Files in a folder — for legacy general-kind sub-dir cwds, filter by kind. */
+export function filesInCwd(cwd: Cwd, data: VaultData): VaultFile[] {
+  const legacy = isLegacyKindPath(cwd);
+  if (legacy) {
+    const node = walkTree(data, [legacy.folderSlug]);
+    if (!node) return [];
+    return node.files.filter((f) => f.kind === legacy.kind);
   }
-  return null;
-}
-
-/** Get a folder by slug — null if not found. */
-export function getFolder(
-  slug: string,
-  data: VaultData,
-): FolderContents | null {
-  return data.folders.find((f) => f.slug === slug) ?? null;
-}
-
-/** Get a kind's file list within a folder. */
-export function getFilesInKind(
-  folder: FolderContents,
-  kind: FileKind,
-): VaultFile[] {
-  return folder[kind];
+  if (cwd.length === 0) return [];
+  const node = walkTree(data, cwd);
+  if (!node) return [];
+  return node.files;
 }
