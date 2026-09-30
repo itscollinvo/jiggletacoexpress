@@ -1,5 +1,9 @@
 import { ProjectCard } from "@/components/ProjectCard";
 import { getAllProjects } from "@/lib/db/queries/projects";
+import {
+  StaggerList,
+  StaggerItem,
+} from "@/components/motion/StaggerList";
 
 // See /src/app/page.tsx for why we force dynamic rendering.
 export const dynamic = "force-dynamic";
@@ -13,11 +17,16 @@ export default async function ProjectsPage() {
       <p className="mt-3 text-foreground/70">
         Things I&apos;m building or have built.
       </p>
-      <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      {/* Stagger primitive: children fade + rise in sequence rather than
+        * snapping in all at once. Uses framer-motion internally but
+        * respects prefers-reduced-motion (falls back to plain divs). */}
+      <StaggerList className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {projects.map((p) => (
-          <ProjectCard key={p.id} project={p} />
+          <StaggerItem key={p.id}>
+            <ProjectCard project={p} />
+          </StaggerItem>
         ))}
-      </div>
+      </StaggerList>
     </div>
   );
 }
