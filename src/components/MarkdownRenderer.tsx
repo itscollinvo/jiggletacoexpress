@@ -82,11 +82,38 @@ const components: Components = {
       {children}
     </h3>
   ),
-  p: ({ children, ...props }) => (
-    <p className="mt-5 leading-7 text-foreground/85" {...props}>
-      {children}
-    </p>
-  ),
+  p: ({ children, node }) => {
+    // If the paragraph contains only a single link and that link is a
+    // GitHub PR URL, unwrap the <p> so PrCard (which renders as a block-
+    // level <a><div>...</div></a>) can sit at the flow level instead of
+    // being nested inside a <p> — which browsers reject as invalid HTML
+    // and Next flags as a hydration mismatch.
+    //
+    // We check the mdast node (react-markdown passes it as a prop) rather
+    // than trying to introspect React children, because the AST tells us
+    // exactly what the source wrote before we mapped anchor → PrCard.
+    // react-markdown passes hast nodes (post-mdast→hast conversion), so
+    // children are hast Elements/Texts. An autolinked bare URL becomes
+    // an <a> element (type: "element", tagName: "a") with the URL in
+    // properties.href — not the mdast shape (type: "link", .url).
+    const kids = node?.children ?? [];
+    const meaningful = kids.filter(
+      (c) => !(c.type === "text" && /^\s*$/.test(c.value)),
+    );
+    const onlyChild = meaningful.length === 1 ? meaningful[0] : null;
+    if (
+      onlyChild &&
+      onlyChild.type === "element" &&
+      onlyChild.tagName === "a" &&
+      typeof onlyChild.properties?.href === "string" &&
+      parseGithubPr(onlyChild.properties.href)
+    ) {
+      return <>{children}</>;
+    }
+    return (
+      <p className="mt-5 leading-7 text-foreground/85">{children}</p>
+    );
+  },
   ul: ({ children, ...props }) => (
     <ul
       className="mt-5 list-disc space-y-2 pl-6 text-foreground/85 marker:text-accent-gold"
