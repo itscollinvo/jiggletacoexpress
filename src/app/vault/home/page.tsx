@@ -1,14 +1,8 @@
 /**
- * /vault/home — server component. Fetches folders and their contents,
- * assembles the V.2 VaultData shape, and hands it to the terminal.
- *
- * Bulk-fetches all rows once and partitions in JS — trivial for our data
- * size (single-digit folders, dozens of items per folder). If it ever
- * grows, replace with per-folder joins.
- *
- * Also passes the admin session state so the terminal knows whether to
- * unlock write commands on mount. The client can transition into an
- * authed state later via `admin login`.
+ * /vault/home — server component. Fetches all folders (as a flat list),
+ * assembles them into a tree by parent_id, then attaches files (notes,
+ * photos, journal) to each node by folder_id. Hands the whole tree to
+ * the terminal in a single VaultData object.
  */
 
 import {
@@ -17,7 +11,7 @@ import {
   getAllVaultNotes,
   getAllVaultJournal,
 } from "@/lib/db/queries/vault";
-import type { VaultData, FolderContents } from "@/lib/vault/filesystem";
+import type { VaultData, FolderNode, VaultFile } from "@/lib/vault/filesystem";
 import { VaultTerminal } from "@/components/vault/Terminal";
 import { getCurrentUser } from "@/lib/auth/auth";
 
@@ -32,41 +26,74 @@ export default async function VaultHome() {
     getCurrentUser(),
   ]);
 
-  // Partition per folder. Rows with a null folder_id shouldn't exist after
-  // V.1 backfill, but we defensively filter to avoid crashes if the DB
-  // gets into a weird state.
-  const folderContents: FolderContents[] = folders.map((f) => ({
-    slug: f.slug,
-    name: f.name,
-    description: f.description,
-    notes: notes
-      .filter((n) => n.folderId === f.id)
-      .map((n) => ({
-        name: n.slug,
-        kind: "notes" as const,
-        content: n.content,
-        createdAt: n.displayDate ?? undefined,
-      })),
-    photos: photos
-      .filter((p) => p.folderId === f.id)
-      .map((p) => ({
-        name: p.filename,
-        kind: "photos" as const,
-        content: p.caption,
-        url: p.url,
-        createdAt: p.takenAt ?? undefined,
-      })),
-    journal: journal
-      .filter((j) => j.folderId === f.id)
-      .map((j) => ({
-        name: `${j.entryDate}.md`,
-        kind: "journal" as const,
-        content: j.content,
-        createdAt: j.entryDate,
-      })),
-  }));
+  // Build a map id → node for O(1) child attachment.
+  const nodesById = new Map<number, FolderNode>();
+  for (const f of folders) {
+    nodesById.set(f.id, {
+      id: f.id,
+      parentId: f.parentId,
+      slug: f.slug,
+      name: f.name,
+      description: f.description,
+      isPublic: f.isPublic,
+      children: [],
+      files: [],
+    });
+  }
 
-  const vaultData: VaultData = { folders: folderContents };
+  // Link parents/children. Collect root nodes (parentId === null).
+  const roots: FolderNode[] = [];
+  for (const node of nodesById.values()) {
+    if (node.parentId === null) {
+      roots.push(node);
+    } else {
+      const parent = nodesById.get(node.parentId);
+      parent?.children.push(node);
+    }
+  }
+
+  // Attach files to their folder. Skip rows with null folder_id (shouldn't
+  // happen post-V.1 backfill but defend anyway).
+  for (const p of photos) {
+    if (p.folderId == null) continue;
+    const node = nodesById.get(p.folderId);
+    if (!node) continue;
+    const f: VaultFile = {
+      name: p.filename,
+      kind: "photos",
+      content: p.caption,
+      url: p.url,
+      createdAt: p.takenAt ?? undefined,
+      isPublic: p.isPublic,
+    };
+    node.files.push(f);
+  }
+  for (const n of notes) {
+    if (n.folderId == null) continue;
+    const node = nodesById.get(n.folderId);
+    if (!node) continue;
+    node.files.push({
+      name: n.slug,
+      kind: "notes",
+      content: n.content,
+      createdAt: n.displayDate ?? undefined,
+      isPublic: n.isPublic,
+    });
+  }
+  for (const j of journal) {
+    if (j.folderId == null) continue;
+    const node = nodesById.get(j.folderId);
+    if (!node) continue;
+    node.files.push({
+      name: `${j.entryDate}.md`,
+      kind: "journal",
+      content: j.content,
+      createdAt: j.entryDate,
+      isPublic: j.isPublic,
+    });
+  }
+
+  const vaultData: VaultData = { roots };
 
   return (
     <VaultTerminal

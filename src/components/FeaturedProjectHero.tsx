@@ -19,6 +19,7 @@
 import Link from "next/link";
 import { GithubIcon } from "./BrandIcons";
 import { HoverLift } from "./motion/HoverLift";
+import { TiltCard } from "./motion/TiltCard";
 import { getEffectiveSlug } from "@/lib/util/project-slug";
 import type { Project } from "@/lib/db/schema";
 
@@ -44,6 +45,7 @@ function ExternalLinkIcon({ className }: { className?: string }) {
 export function FeaturedProjectHero({ project }: { project: Project }) {
   const slug = getEffectiveSlug(project);
   return (
+    <TiltCard className="h-full" maxTilt={2.5}>
     <HoverLift scale={1.008} className="h-full">
       <article className="group relative grid h-full grid-cols-1 gap-0 overflow-hidden rounded-3xl border border-border bg-foreground/3 transition-colors hover:border-accent-coral lg:grid-cols-5">
         {/* Full-card overlay link — see ProjectCard for the linked-card
@@ -134,5 +136,6 @@ export function FeaturedProjectHero({ project }: { project: Project }) {
         </div>
       </article>
     </HoverLift>
+    </TiltCard>
   );
 }

@@ -1,13 +1,10 @@
 "use server";
 
 /**
- * Server actions invoked by terminal write commands (mkdir/rmdir/touch/rm)
- * plus `admin logout` (login uses the existing /api/auth/login endpoint
- * directly from the client — no server action needed).
+ * V.3 server actions for the vault terminal.
  *
- * Every mutation calls requireCurrentUser() so a guest running commands
- * gets a proper 401-equivalent. The terminal renders the thrown error as
- * a red line — matches Unix's "permission denied" vibe.
+ * All mutating commands require an authenticated admin — anon terminal
+ * commands get a "permission denied" result rendered as a red error line.
  */
 
 import { revalidatePath } from "next/cache";
@@ -15,10 +12,9 @@ import { requireCurrentUser } from "@/lib/auth/auth";
 import {
   createVaultFolder,
   deleteVaultFolder,
-  getVaultFolderBySlug,
+  getFolderByPath,
   countFolderContents,
   createNoteInFolder,
-  createJournalInFolder,
   findNoteByName,
   findPhotoByName,
   findJournalByName,
@@ -26,86 +22,131 @@ import {
   deleteVaultPhoto,
   deleteVaultJournalEntry,
 } from "@/lib/db/queries/vault";
-import { RESERVED_FOLDER_SLUGS, type FileKind } from "@/lib/vault/filesystem";
+import {
+  RESERVED_FOLDER_SLUGS,
+  LEGACY_GENERAL_SLUG,
+} from "@/lib/vault/filesystem";
 
-/**
- * Consistent result shape for terminal commands. `ok:false` messages get
- * rendered as red error lines; `ok:true` may include a message shown as a
- * dim output line ("created folder 'climbing-2025'").
- */
 export type CmdResult =
   | { ok: true; message?: string }
   | { ok: false; message: string };
 
-/** Kebab-case validator for folder slugs — same rules as blog + projects. */
 const SLUG_RE = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 
-function validateFolderSlug(input: string): string | null {
+function validateSlug(input: string): string | null {
   const s = input.trim().toLowerCase();
-  if (!s) return "folder name is required";
-  if (s.length > 120) return "folder name too long (max 120)";
-  if (!SLUG_RE.test(s)) return "folder name must be kebab-case (a-z, 0-9, hyphens)";
+  if (!s) return "name is required";
+  if (s.length > 120) return "name too long (max 120)";
+  if (!SLUG_RE.test(s)) return "name must be kebab-case (a-z, 0-9, hyphens)";
   if (RESERVED_FOLDER_SLUGS.has(s)) return `'${s}' is reserved`;
   return null;
 }
 
-/* ----- mkdir ----- */
-
-export async function mkdirAction(slug: string): Promise<CmdResult> {
+/**
+ * mkdirAction — creates a folder at the given path. Path is relative to
+ * the current cwd. If the path has multiple segments, all but the last
+ * must already exist (no `mkdir -p` behavior).
+ */
+export async function mkdirAction(input: {
+  cwd: string[];
+  arg: string;
+}): Promise<CmdResult> {
   try {
     await requireCurrentUser();
   } catch {
     return { ok: false, message: "permission denied — run 'admin login'" };
   }
 
-  const err = validateFolderSlug(slug);
+  const arg = input.arg.trim();
+  if (!arg) return { ok: false, message: "mkdir: missing name" };
+
+  // Resolve target path: if arg contains slashes, treat as a subpath from cwd;
+  // otherwise create in cwd.
+  const parts = arg.split("/").filter(Boolean);
+  const newSlug = parts.pop()!;
+  const parentPath = [...input.cwd, ...parts];
+
+  const err = validateSlug(newSlug);
   if (err) return { ok: false, message: `mkdir: ${err}` };
 
-  const cleaned = slug.trim().toLowerCase();
-  const existing = await getVaultFolderBySlug(cleaned);
-  if (existing) return { ok: false, message: `mkdir: '${cleaned}' already exists` };
+  // Resolve parent id
+  let parentId: number | null = null;
+  if (parentPath.length > 0) {
+    const parent = await getFolderByPath(parentPath);
+    if (!parent) {
+      return {
+        ok: false,
+        message: `mkdir: parent '${parentPath.join("/")}' not found`,
+      };
+    }
+    parentId = parent.id;
+  }
 
-  await createVaultFolder({ slug: cleaned, name: cleaned });
+  // Check for duplicate under same parent
+  const existing = await getFolderByPath([...parentPath, newSlug]);
+  if (existing) {
+    return { ok: false, message: `mkdir: '${newSlug}' already exists` };
+  }
+
+  await createVaultFolder({
+    slug: newSlug,
+    name: newSlug,
+    parentId,
+  });
   revalidatePath("/vault/home");
-  return { ok: true, message: `created folder '${cleaned}'` };
+  return { ok: true, message: `created ${newSlug}/` };
 }
 
-/* ----- rmdir ----- */
-
-export async function rmdirAction(slug: string): Promise<CmdResult> {
+/** rmdirAction — deletes an empty folder at a path relative to cwd. */
+export async function rmdirAction(input: {
+  cwd: string[];
+  arg: string;
+}): Promise<CmdResult> {
   try {
     await requireCurrentUser();
   } catch {
     return { ok: false, message: "permission denied — run 'admin login'" };
   }
 
-  const cleaned = slug.trim().toLowerCase();
-  const folder = await getVaultFolderBySlug(cleaned);
-  if (!folder) return { ok: false, message: `rmdir: '${cleaned}': no such folder` };
-  if (folder.slug === "general") {
+  const arg = input.arg.trim();
+  if (!arg) return { ok: false, message: "rmdir: missing name" };
+
+  const parts = arg.split("/").filter(Boolean);
+  const path = [...input.cwd, ...parts];
+
+  // Refuse to delete /general — it's the legacy default and holds pre-V.1 content
+  if (path.length === 1 && path[0] === LEGACY_GENERAL_SLUG) {
     return { ok: false, message: "rmdir: cannot delete the default folder" };
   }
 
+  const folder = await getFolderByPath(path);
+  if (!folder) return { ok: false, message: `rmdir: '${arg}': no such folder` };
+
   const hasContents = await countFolderContents(folder.id);
   if (hasContents) {
-    return { ok: false, message: `rmdir: '${cleaned}' not empty — delete files first` };
+    return {
+      ok: false,
+      message: `rmdir: '${arg}' not empty — delete files first`,
+    };
   }
 
   await deleteVaultFolder(folder.id);
   revalidatePath("/vault/home");
-  return { ok: true, message: `removed folder '${cleaned}'` };
+  return { ok: true, message: `removed ${arg}/` };
 }
 
-/* ----- touch (in a kind dir) ----- */
-
 /**
- * Create an empty note or journal entry in the current folder + kind.
- * Photos can't be `touch`ed — they need real image bytes; use upload later.
+ * touchAction — creates an empty text file in the current folder. In the
+ * legacy /general folder, respects the kind sub-dir (notes/photos/journal).
+ * Elsewhere, always creates a note.
+ *
+ * Filename convention: a filename matching YYYY-MM-DD.md creates a journal
+ * entry instead of a note. This preserves the journal concept for anyone
+ * who wants date-keyed entries without needing a separate command.
  */
 export async function touchAction(input: {
-  folderSlug: string;
-  kind: FileKind;
-  name: string;
+  cwd: string[];
+  arg: string;
 }): Promise<CmdResult> {
   try {
     await requireCurrentUser();
@@ -113,41 +154,57 @@ export async function touchAction(input: {
     return { ok: false, message: "permission denied — run 'admin login'" };
   }
 
-  const folder = await getVaultFolderBySlug(input.folderSlug);
-  if (!folder) return { ok: false, message: `touch: folder '${input.folderSlug}' not found` };
+  const name = input.arg.trim();
+  if (!name) return { ok: false, message: "touch: missing filename" };
 
-  const name = input.name.trim();
-  if (!name) return { ok: false, message: "touch: filename is required" };
-
-  if (input.kind === "photos") {
-    return {
-      ok: false,
-      message: "touch: photos need bytes — try upload (coming later)",
-    };
+  // Photos need bytes — refuse.
+  if (/\.(jpg|jpeg|png|gif|webp)$/i.test(name)) {
+    return { ok: false, message: "touch: photos need bytes — upload command coming later" };
   }
 
-  if (input.kind === "notes") {
-    const dup = await findNoteByName(folder.id, name);
+  // Resolve target folder. In legacy general kind sub-dirs, the parent is /general.
+  const legacy = input.cwd.length === 2 && input.cwd[0] === LEGACY_GENERAL_SLUG
+    ? input.cwd[1]
+    : null;
+
+  const folderPath = legacy ? [LEGACY_GENERAL_SLUG] : input.cwd;
+  if (folderPath.length === 0) {
+    return { ok: false, message: "touch: cd into a folder first" };
+  }
+  const folder = await getFolderByPath(folderPath);
+  if (!folder) return { ok: false, message: "touch: folder not found" };
+
+  // Journal detection: YYYY-MM-DD.md → journal entry
+  const journalMatch = name.match(/^(\d{4}-\d{2}-\d{2})\.md$/);
+  const isLegacyJournalDir = legacy === "journal";
+  const isLegacyPhotoDir = legacy === "photos";
+
+  if (isLegacyPhotoDir) {
+    return { ok: false, message: "touch: photos need bytes — upload command coming later" };
+  }
+
+  if (isLegacyJournalDir || journalMatch) {
+    const entryDate = journalMatch ? journalMatch[1]! : name.replace(/\.md$/, "");
+    const dup = await findJournalByName(folder.id, entryDate);
     if (dup) return { ok: false, message: `touch: '${name}' already exists` };
-    await createNoteInFolder({ folderId: folder.id, slug: name, content: "" });
+    const { createJournalInFolder } = await import("@/lib/db/queries/vault");
+    await createJournalInFolder({ folderId: folder.id, entryDate, content: "" });
     revalidatePath("/vault/home");
     return { ok: true, message: `created ${name}` };
   }
 
-  // journal
-  const dup = await findJournalByName(folder.id, name);
+  // Default: create a note
+  const dup = await findNoteByName(folder.id, name);
   if (dup) return { ok: false, message: `touch: '${name}' already exists` };
-  await createJournalInFolder({ folderId: folder.id, entryDate: name, content: "" });
+  await createNoteInFolder({ folderId: folder.id, slug: name, content: "" });
   revalidatePath("/vault/home");
   return { ok: true, message: `created ${name}` };
 }
 
-/* ----- rm (in a kind dir) ----- */
-
+/** rmAction — deletes a file in the current folder. Kind inferred by lookup. */
 export async function rmAction(input: {
-  folderSlug: string;
-  kind: FileKind;
-  name: string;
+  cwd: string[];
+  arg: string;
 }): Promise<CmdResult> {
   try {
     await requireCurrentUser();
@@ -155,26 +212,41 @@ export async function rmAction(input: {
     return { ok: false, message: "permission denied — run 'admin login'" };
   }
 
-  const folder = await getVaultFolderBySlug(input.folderSlug);
-  if (!folder) return { ok: false, message: `rm: folder '${input.folderSlug}' not found` };
+  const name = input.arg.trim();
+  if (!name) return { ok: false, message: "rm: missing filename" };
 
-  const name = input.name.trim();
-  if (!name) return { ok: false, message: "rm: filename is required" };
+  // Same legacy-folder-resolution as touch
+  const legacy = input.cwd.length === 2 && input.cwd[0] === LEGACY_GENERAL_SLUG
+    ? input.cwd[1]
+    : null;
+  const folderPath = legacy ? [LEGACY_GENERAL_SLUG] : input.cwd;
+  if (folderPath.length === 0) {
+    return { ok: false, message: "rm: cd into a folder first" };
+  }
+  const folder = await getFolderByPath(folderPath);
+  if (!folder) return { ok: false, message: "rm: folder not found" };
 
-  if (input.kind === "notes") {
-    const row = await findNoteByName(folder.id, name);
-    if (!row) return { ok: false, message: `rm: '${name}': no such file` };
-    await deleteVaultNote(row.id);
-  } else if (input.kind === "photos") {
-    const row = await findPhotoByName(folder.id, name);
-    if (!row) return { ok: false, message: `rm: '${name}': no such file` };
-    await deleteVaultPhoto(row.id);
-  } else {
-    const row = await findJournalByName(folder.id, name);
-    if (!row) return { ok: false, message: `rm: '${name}': no such file` };
-    await deleteVaultJournalEntry(row.id);
+  // Try each kind in turn (matches the ls union behavior).
+  const note = await findNoteByName(folder.id, name);
+  if (note) {
+    await deleteVaultNote(note.id);
+    revalidatePath("/vault/home");
+    return { ok: true, message: `removed ${name}` };
+  }
+  const photo = await findPhotoByName(folder.id, name);
+  if (photo) {
+    await deleteVaultPhoto(photo.id);
+    revalidatePath("/vault/home");
+    return { ok: true, message: `removed ${name}` };
+  }
+  // Journal entries stored with entryDate as name; the ls view suffixes ".md"
+  const journalKey = name.replace(/\.md$/, "");
+  const j = await findJournalByName(folder.id, journalKey);
+  if (j) {
+    await deleteVaultJournalEntry(j.id);
+    revalidatePath("/vault/home");
+    return { ok: true, message: `removed ${name}` };
   }
 
-  revalidatePath("/vault/home");
-  return { ok: true, message: `removed ${name}` };
+  return { ok: false, message: `rm: '${name}': no such file` };
 }

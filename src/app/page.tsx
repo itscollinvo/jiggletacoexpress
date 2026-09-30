@@ -5,6 +5,8 @@ import { NowPlaying } from "@/components/NowPlaying";
 import { ProjectCard } from "@/components/ProjectCard";
 import { getFeaturedProjects } from "@/lib/db/queries/projects";
 import { getPublishedPosts } from "@/lib/db/queries/blog";
+import { SlideIn } from "@/components/motion/SlideIn";
+import { Parallax } from "@/components/motion/Parallax";
 
 const homeDateFmt = new Intl.DateTimeFormat(undefined, {
   month: "long",
@@ -32,7 +34,9 @@ export default async function Home() {
 
   return (
     <div className="mx-auto max-w-3xl px-6 pt-20 pb-16 lg:px-12 lg:pt-16">
-      {/* Hero */}
+      {/* Hero — SlideIn from below for a stronger entrance than the R.1
+        * page-transition alone. */}
+      <SlideIn onScroll={false} from="up" offset={20}>
       <section className="flex flex-col gap-6">
         <h1 className="text-4xl font-bold tracking-tight text-foreground sm:text-5xl">
           I am <span className="text-accent-coral">jiggletaco</span>, I like to
@@ -40,10 +44,13 @@ export default async function Home() {
           <span className="text-accent-gold">&amp;</span> enjoyable :)
         </h1>
 
-        <NowPlaying />
+        <Parallax strength={20}>
+          <NowPlaying />
+        </Parallax>
 
         <p className="text-lg text-foreground/80">Welcome to my domain.</p>
       </section>
+      </SlideIn>
 
       {/* Professional intro */}
       <section className="mt-12 flex flex-col gap-4">
@@ -148,6 +155,19 @@ export default async function Home() {
           ))}
         </div>
       </section>
+
+      {/* Terminal-style vault easter egg. Meant to look like a prompt at
+        * the bottom of the page — monospaced, dim, no visual emphasis.
+        * People who know what `> vault` means will notice; the rest scroll
+        * past. Keeps the vault deliberately understated on the front. */}
+      <footer className="mt-24 border-t border-border pt-6">
+        <Link
+          href="/vault"
+          className="inline-block font-mono text-xs text-foreground/35 transition-colors hover:text-accent-hover"
+        >
+          &gt; vault
+        </Link>
+      </footer>
     </div>
   );
 }

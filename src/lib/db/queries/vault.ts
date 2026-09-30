@@ -1,5 +1,5 @@
 import "server-only";
-import { and, eq, desc, asc } from "drizzle-orm";
+import { and, eq, desc, asc, isNull } from "drizzle-orm";
 import { getDb } from "../index";
 import {
   vaultFolders,
@@ -87,6 +87,18 @@ export async function getAllVaultFolders() {
     .orderBy(asc(vaultFolders.sortOrder), asc(vaultFolders.name));
 }
 
+/** Direct children of a given folder id, or all root folders if null. */
+export async function getChildFolders(parentId: number | null) {
+  const db = getDb();
+  const q = db
+    .select()
+    .from(vaultFolders)
+    .orderBy(asc(vaultFolders.sortOrder), asc(vaultFolders.name));
+  return parentId === null
+    ? q.where(isNull(vaultFolders.parentId))
+    : q.where(eq(vaultFolders.parentId, parentId));
+}
+
 export async function getVaultFolderBySlug(slug: string) {
   const db = getDb();
   const [row] = await db
@@ -100,6 +112,7 @@ export async function getVaultFolderBySlug(slug: string) {
 export async function createVaultFolder(input: {
   slug: string;
   name: string;
+  parentId: number | null;
   description?: string;
 }) {
   const db = getDb();
@@ -108,10 +121,47 @@ export async function createVaultFolder(input: {
     .values({
       slug: input.slug,
       name: input.name,
+      parentId: input.parentId,
       description: input.description ?? "",
     })
     .returning();
   return row;
+}
+
+/**
+ * Look up a folder by an ordered array of slugs from root. Walks the tree
+ * with N sequential queries (one per level). Fine for the typical 1–3
+ * levels this vault will ever have.
+ */
+export async function getFolderByPath(
+  path: string[],
+): Promise<{ id: number; slug: string; isPublic: boolean } | null> {
+  if (path.length === 0) return null;
+  const db = getDb();
+  let parentId: number | null = null;
+  let last: { id: number; slug: string; isPublic: boolean } | null = null;
+  for (const slug of path) {
+    const [row]: Array<{ id: number; slug: string; isPublic: boolean }> = await db
+      .select({
+        id: vaultFolders.id,
+        slug: vaultFolders.slug,
+        isPublic: vaultFolders.isPublic,
+      })
+      .from(vaultFolders)
+      .where(
+        and(
+          eq(vaultFolders.slug, slug),
+          parentId === null
+            ? isNull(vaultFolders.parentId)
+            : eq(vaultFolders.parentId, parentId),
+        ),
+      )
+      .limit(1);
+    if (!row) return null;
+    parentId = row.id;
+    last = row;
+  }
+  return last;
 }
 
 export async function deleteVaultFolder(id: number) {

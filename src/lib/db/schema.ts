@@ -22,6 +22,8 @@ import {
   boolean,
   integer,
   timestamp,
+  unique,
+  type AnyPgColumn,
 } from "drizzle-orm/pg-core";
 
 export const projects = pgTable("projects", {
@@ -176,20 +178,41 @@ export type NewIntegrationToken = typeof integrationTokens.$inferInsert;
  * reserved slugs (admin, api, login, home) is enforced at the validation
  * layer to avoid path collisions.
  * ------------------------------------------------------------------------- */
-export const vaultFolders = pgTable("vault_folders", {
-  id: serial("id").primaryKey(),
-  slug: varchar("slug", { length: 120 }).notNull().unique(),
-  name: varchar("name", { length: 200 }).notNull(),
-  description: text("description").notNull().default(""),
-  isPublic: boolean("is_public").notNull().default(false),
-  sortOrder: integer("sort_order").notNull().default(0),
-  createdAt: timestamp("created_at", { withTimezone: true })
-    .notNull()
-    .defaultNow(),
-  updatedAt: timestamp("updated_at", { withTimezone: true })
-    .notNull()
-    .defaultNow(),
-});
+export const vaultFolders = pgTable(
+  "vault_folders",
+  {
+    id: serial("id").primaryKey(),
+
+    // V.3 — nested folder support. NULL parent = root. Self-referential FK
+    // with RESTRICT so you can't nuke a parent that still has children.
+    parentId: integer("parent_id").references((): AnyPgColumn => vaultFolders.id, {
+      onDelete: "restrict",
+    }),
+
+    slug: varchar("slug", { length: 120 }).notNull(),
+    name: varchar("name", { length: 200 }).notNull(),
+    description: text("description").notNull().default(""),
+    // is_public flag toggles visibility for the non-admin (code-gated) viewer.
+    // false = shown in red on `ls`, `cd` refuses. Admin sees everything.
+    isPublic: boolean("is_public").notNull().default(true),
+    sortOrder: integer("sort_order").notNull().default(0),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  // Slug is unique within a parent, not globally. Two folders can both be
+  // called "photos" as long as they live under different parents. Enforced
+  // via a partial-like composite unique.
+  (table) => ({
+    parentSlugUniq: unique("vault_folders_parent_slug_uniq").on(
+      table.parentId,
+      table.slug,
+    ),
+  }),
+);
 
 export type VaultFolder = typeof vaultFolders.$inferSelect;
 export type NewVaultFolder = typeof vaultFolders.$inferInsert;
@@ -215,6 +238,8 @@ export const vaultPhotos = pgTable("vault_photos", {
   url: text("url").notNull(),
   caption: text("caption").notNull().default(""),
   takenAt: varchar("taken_at", { length: 100 }),
+  // V.3 — hidden flag. Guests see hidden items in red on ls but can't cat.
+  isPublic: boolean("is_public").notNull().default(true),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),
@@ -243,6 +268,7 @@ export const vaultNotes = pgTable("vault_notes", {
   slug: varchar("slug", { length: 255 }).notNull(),
   content: text("content").notNull(),
   displayDate: varchar("display_date", { length: 100 }),
+  isPublic: boolean("is_public").notNull().default(true),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),
@@ -269,6 +295,7 @@ export const vaultJournal = pgTable("vault_journal", {
   }),
   entryDate: varchar("entry_date", { length: 100 }).notNull(),
   content: text("content").notNull(),
+  isPublic: boolean("is_public").notNull().default(true),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),

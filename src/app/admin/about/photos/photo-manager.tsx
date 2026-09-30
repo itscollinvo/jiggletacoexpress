@@ -47,7 +47,7 @@ async function uploadToBlobEndpoint(
   return (await res.json()) as { url: string };
 }
 
-function DeletePhotoButton({ id }: { id: number }) {
+function DeletePhotoButton() {
   const { pending } = useFormStatus();
   return (
     <button
@@ -175,7 +175,7 @@ export function PhotoManager({ photos }: Props) {
                 ) : null}
                 <form action={deleteAboutPhotoAction}>
                   <input type="hidden" name="id" value={p.id} />
-                  <DeletePhotoButton id={p.id} />
+                  <DeletePhotoButton />
                 </form>
               </li>
             ))}
