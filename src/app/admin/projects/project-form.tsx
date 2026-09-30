@@ -15,6 +15,8 @@
 import { useActionState } from "react";
 import Link from "next/link";
 import type { ActionResult } from "./actions";
+import { TagChipInput } from "@/components/admin/TagChipInput";
+import { PROJECT_STATUSES } from "@/lib/validation/project";
 
 type FormAction = (
   prev: ActionResult | null,
@@ -31,6 +33,9 @@ interface Props {
     imageUrl?: string | null;
     featured?: boolean;
     displayOrder?: number;
+    techStack?: string[];
+    status?: string;
+    demoUrl?: string | null;
   };
   /** Button label — "Create project" vs "Save changes". */
   submitLabel: string;
@@ -99,6 +104,45 @@ export function ProjectForm({ action, defaults, submitLabel }: Props) {
         ) : null}
       </label>
 
+      {/* Demo URL — separate from GitHub. Hosted demos are a different
+        * signal than "source is here" — split them so the card can render
+        * them as distinct CTAs. */}
+      <label className="block space-y-2">
+        <span className="text-sm font-medium text-foreground">
+          Demo URL <span className="text-foreground/50">(optional)</span>
+        </span>
+        <input
+          type="url"
+          name="demoUrl"
+          defaultValue={defaults?.demoUrl ?? ""}
+          placeholder="https://..."
+          className="w-full rounded-2xl border border-border bg-background px-4 py-3 text-sm text-foreground outline-none transition-colors focus:border-accent-coral"
+        />
+        {fieldErrors?.demoUrl ? (
+          <span className="text-xs text-accent-coral">
+            {fieldErrors.demoUrl}
+          </span>
+        ) : null}
+      </label>
+
+      {/* Tech stack — chip input, serializes to CSV so the existing
+        * splitCsv preprocess in ProjectInputSchema handles it. Reuse of
+        * the same component the blog editor uses for tags. */}
+      <div className="space-y-2">
+        <span className="text-sm font-medium text-foreground">
+          Tech stack{" "}
+          <span className="text-foreground/50">
+            (add each tag with Enter or comma)
+          </span>
+        </span>
+        <TagChipInput
+          name="techStack"
+          defaultTags={defaults?.techStack ?? []}
+          placeholder="React, Postgres, Vercel…"
+          fieldError={fieldErrors?.techStack}
+        />
+      </div>
+
       {/* Image — file upload OR URL fallback.
        *
        * Two ways to provide an image:
@@ -164,7 +208,7 @@ export function ProjectForm({ action, defaults, submitLabel }: Props) {
         </label>
       </div>
 
-      <div className="grid gap-6 sm:grid-cols-2">
+      <div className="grid gap-6 sm:grid-cols-3">
         {/* Display order */}
         <label className="block space-y-2">
           <span className="text-sm font-medium text-foreground">
@@ -188,6 +232,30 @@ export function ProjectForm({ action, defaults, submitLabel }: Props) {
           ) : null}
         </label>
 
+        {/* Status — drives the badge on the card. */}
+        <label className="block space-y-2">
+          <span className="text-sm font-medium text-foreground">Status</span>
+          <select
+            name="status"
+            defaultValue={defaults?.status ?? "active"}
+            className="w-full rounded-2xl border border-border bg-background px-4 py-3 text-sm text-foreground outline-none transition-colors focus:border-accent-coral"
+          >
+            {PROJECT_STATUSES.map((s) => (
+              <option key={s} value={s}>
+                {s === "wip" ? "Work in progress" : s.charAt(0).toUpperCase() + s.slice(1)}
+              </option>
+            ))}
+          </select>
+          <span className="text-xs text-foreground/60">
+            Shown as a badge on the card ("active" gets no badge).
+          </span>
+          {fieldErrors?.status ? (
+            <span className="block text-xs text-accent-coral">
+              {fieldErrors.status}
+            </span>
+          ) : null}
+        </label>
+
         {/* Featured */}
         <label className="flex cursor-pointer items-center gap-3 self-end pb-2 text-sm">
           <input
@@ -197,7 +265,7 @@ export function ProjectForm({ action, defaults, submitLabel }: Props) {
             defaultChecked={defaults?.featured ?? false}
             className="h-4 w-4 accent-accent-coral"
           />
-          <span className="text-foreground">Show on front-page hero</span>
+          <span className="text-foreground">Feature at top of /projects</span>
         </label>
       </div>
 

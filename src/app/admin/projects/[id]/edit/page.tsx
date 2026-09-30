@@ -53,6 +53,9 @@ export default async function EditProjectPage({ params }: PageProps) {
             imageUrl: project.imageUrl,
             featured: project.featured,
             displayOrder: project.displayOrder,
+            techStack: project.techStack,
+            status: project.status,
+            demoUrl: project.demoUrl,
           }}
         />
       </div>

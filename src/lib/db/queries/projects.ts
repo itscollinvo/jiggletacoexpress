@@ -35,6 +35,23 @@ export async function getFeaturedProjects() {
     .orderBy(asc(projects.displayOrder));
 }
 
+/**
+ * Split the projects list into "featured hero row" (top-N featured) and
+ * "everything else" for the /projects page. R.2 chose N=2 (side-by-side
+ * on desktop, stacked on mobile). Anything featured beyond N spills into
+ * the rest grid rather than pushing the layout wider.
+ *
+ * Kept as a single DB round-trip: fetch all projects (sorted), partition
+ * in JS. Cheaper than two separate queries + a limit for a small dataset.
+ */
+export async function getProjectsSplit(featuredLimit = 2) {
+  const all = await getAllProjects();
+  const featured = all.filter((p) => p.featured).slice(0, featuredLimit);
+  const featuredIds = new Set(featured.map((p) => p.id));
+  const rest = all.filter((p) => !featuredIds.has(p.id));
+  return { featured, rest };
+}
+
 export async function getProjectById(id: number) {
   const db = getDb();
   const [project] = await db

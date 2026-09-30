@@ -49,6 +49,23 @@ export const projects = pgTable("projects", {
   // Defaulting to 0 means "shows at the top until manually ordered".
   displayOrder: integer("display_order").notNull().default(0),
 
+  // R.2 additions — richer project metadata for the new card design.
+
+  // Postgres native text[] for tech stack tags ("React", "Postgres", ...).
+  // Rendered as chips on the card. Drizzle's .array() maps to `text[]` and
+  // TS sees this as string[]. Default [] so existing rows still render.
+  techStack: text("tech_stack").array().notNull().default([]),
+
+  // Project lifecycle: "active" (current), "wip" (work in progress, badge
+  // shown), "archived" (still visible but muted). Stored as varchar(16)
+  // rather than a Postgres enum so we can add values later without a
+  // migration. Zod on the input side validates the union.
+  status: varchar("status", { length: 16 }).notNull().default("active"),
+
+  // Optional live-demo link, separate from GitHub. Nullable — plenty of
+  // projects only have source, no hosted demo.
+  demoUrl: varchar("demo_url", { length: 500 }),
+
   // `withTimezone: true` stores `timestamptz` in Postgres — recommended over
   // plain `timestamp` because it normalizes to UTC and renders correctly
   // regardless of the server's locale. `defaultNow()` becomes `DEFAULT NOW()`
