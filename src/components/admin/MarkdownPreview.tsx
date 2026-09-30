@@ -52,9 +52,26 @@ const components: Components = {
   h3: ({ children }) => (
     <h3 className="mt-6 text-lg font-semibold text-foreground">{children}</h3>
   ),
-  p: ({ children }) => (
-    <p className="mt-4 leading-6 text-foreground/85">{children}</p>
-  ),
+  p: ({ children, node }) => {
+    // Same unwrap-for-PR-embed logic as MarkdownRenderer — see comment
+    // there. Keeping the preview aligned with the public renderer so
+    // authors see hydration-safe output while drafting.
+    const kids = node?.children ?? [];
+    const meaningful = kids.filter(
+      (c) => !(c.type === "text" && /^\s*$/.test(c.value)),
+    );
+    const onlyChild = meaningful.length === 1 ? meaningful[0] : null;
+    if (
+      onlyChild &&
+      onlyChild.type === "element" &&
+      onlyChild.tagName === "a" &&
+      typeof onlyChild.properties?.href === "string" &&
+      parseGithubPr(onlyChild.properties.href)
+    ) {
+      return <>{children}</>;
+    }
+    return <p className="mt-4 leading-6 text-foreground/85">{children}</p>;
+  },
   ul: ({ children }) => (
     <ul className="mt-4 list-disc space-y-1 pl-6 text-foreground/85 marker:text-accent-gold">
       {children}
