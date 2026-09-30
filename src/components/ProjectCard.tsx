@@ -21,6 +21,7 @@
 import Link from "next/link";
 import { GithubIcon } from "./BrandIcons";
 import { HoverLift } from "./motion/HoverLift";
+import { getEffectiveSlug } from "@/lib/util/project-slug";
 import type { Project } from "@/lib/db/schema";
 
 /**
@@ -73,9 +74,27 @@ function ExternalLinkIcon({ className }: { className?: string }) {
 }
 
 export function ProjectCard({ project }: { project: Project }) {
+  const slug = getEffectiveSlug(project);
   return (
     <HoverLift className="h-full">
+      {/* "Linked card" pattern:
+       *   - Article is the visual container with hover state
+       *   - An invisible <Link> overlay at z-10 covers the entire card,
+       *     so any click anywhere on the card body navigates to detail
+       *   - The Source / Live demo anchors in the footer sit at z-20,
+       *     ABOVE the overlay, so clicks on those hit the intended
+       *     external links instead of the overlay
+       *   - This avoids invalid nested <a> elements while still letting
+       *     the whole card feel clickable */}
       <article className="group relative flex h-full flex-col overflow-hidden rounded-3xl border border-border bg-foreground/3 transition-colors hover:border-accent-coral">
+        {/* Overlay link — the entire card clicks through to /projects/[slug].
+          * aria-label duplicates the title so screen readers announce
+          * something meaningful when they land on the anchor. */}
+        <Link
+          href={`/projects/${slug}`}
+          aria-label={project.title}
+          className="absolute inset-0 z-10 rounded-3xl focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-coral focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+        />
         {/* Thumbnail. When no image, show a subtle placeholder so cards
           * don't visually collapse. */}
         <div className="relative aspect-video w-full overflow-hidden bg-foreground/5">
@@ -123,9 +142,11 @@ export function ProjectCard({ project }: { project: Project }) {
             </ul>
           ) : null}
 
-          {/* Link row — github + demo. Renders only if at least one exists. */}
+          {/* Link row — github + demo. Renders only if at least one exists.
+            * z-20 puts these anchors above the overlay Link so clicks
+            * land here, not on the card's detail-page navigation. */}
           {(project.githubUrl || project.demoUrl) && (
-            <div className="mt-2 flex flex-wrap gap-2 border-t border-border pt-3">
+            <div className="relative z-20 mt-2 flex flex-wrap gap-2 border-t border-border pt-3">
               {project.githubUrl && (
                 <Link
                   href={project.githubUrl}

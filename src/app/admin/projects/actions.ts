@@ -34,6 +34,7 @@ import {
   ProjectInputSchema,
   toDbInput,
 } from "@/lib/validation/project";
+import { slugify } from "@/lib/util/project-slug";
 
 const ALLOWED_IMAGE_TYPES = new Set([
   "image/png",
@@ -131,14 +132,28 @@ export async function createProjectAction(
     techStack: formData.get("techStack"),
     status: formData.get("status"),
     demoUrl: formData.get("demoUrl"),
+    slug: formData.get("slug"),
+    longMarkdown: formData.get("longMarkdown"),
+    screenshots: formData.get("screenshots"),
   });
 
   if (!parsed.success) {
     return { ok: false, fieldErrors: flattenZodErrors(parsed.error) };
   }
 
+  // Auto-fill slug from title if the admin didn't provide one. This keeps
+  // the "always click through" behavior on /projects working even if the
+  // admin forgets to type a slug — every project ends up with a stable
+  // URL on first save.
+  const withSlug = {
+    ...parsed.data,
+    slug: parsed.data.slug && parsed.data.slug.length > 0
+      ? parsed.data.slug
+      : slugify(parsed.data.title),
+  };
+
   try {
-    await createProject(toDbInput(parsed.data));
+    await createProject(toDbInput(withSlug));
   } catch (err) {
     return {
       ok: false,
@@ -191,13 +206,23 @@ export async function updateProjectAction(
     techStack: formData.get("techStack"),
     status: formData.get("status"),
     demoUrl: formData.get("demoUrl"),
+    slug: formData.get("slug"),
+    longMarkdown: formData.get("longMarkdown"),
+    screenshots: formData.get("screenshots"),
   });
 
   if (!parsed.success) {
     return { ok: false, fieldErrors: flattenZodErrors(parsed.error) };
   }
 
-  const result = await updateProject(id, toDbInput(parsed.data));
+  const withSlugUpdate = {
+    ...parsed.data,
+    slug: parsed.data.slug && parsed.data.slug.length > 0
+      ? parsed.data.slug
+      : slugify(parsed.data.title),
+  };
+
+  const result = await updateProject(id, toDbInput(withSlugUpdate));
   if (!result) {
     return { ok: false, formError: "Project not found" };
   }

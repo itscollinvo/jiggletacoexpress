@@ -12,11 +12,13 @@
  *   - isPending: true while the action is in flight
  */
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import Link from "next/link";
 import type { ActionResult } from "./actions";
 import { TagChipInput } from "@/components/admin/TagChipInput";
+import { ScreenshotUploader } from "@/components/admin/ScreenshotUploader";
 import { PROJECT_STATUSES } from "@/lib/validation/project";
+import { slugify } from "@/lib/util/project-slug";
 
 type FormAction = (
   prev: ActionResult | null,
@@ -36,6 +38,9 @@ interface Props {
     techStack?: string[];
     status?: string;
     demoUrl?: string | null;
+    slug?: string | null;
+    longMarkdown?: string;
+    screenshots?: string[];
   };
   /** Button label — "Create project" vs "Save changes". */
   submitLabel: string;
@@ -49,6 +54,17 @@ export function ProjectForm({ action, defaults, submitLabel }: Props) {
   const fieldErrors = !state.ok ? state.fieldErrors : undefined;
   const formError = !state.ok ? state.formError : undefined;
 
+  // Slug is controlled so we can auto-fill from the title until the user
+  // touches the slug field. Same pattern the blog form uses (see comments
+  // in src/app/admin/blog/post-form.tsx). Derived at render time — no
+  // useEffect state-mirroring anti-pattern.
+  const [title, setTitle] = useState(defaults?.title ?? "");
+  const [manualSlug, setManualSlug] = useState(defaults?.slug ?? "");
+  const [slugTouched, setSlugTouched] = useState(
+    !!defaults?.slug && defaults.slug.length > 0,
+  );
+  const slug = slugTouched ? manualSlug : slugify(title);
+
   return (
     // encType="multipart/form-data" is REQUIRED to send files in a form
     // submission. Without it, the file input's value is sent as just a name
@@ -60,11 +76,36 @@ export function ProjectForm({ action, defaults, submitLabel }: Props) {
         <input
           name="title"
           required
-          defaultValue={defaults?.title ?? ""}
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
           className="w-full rounded-2xl border border-border bg-background px-4 py-3 text-sm text-foreground outline-none transition-colors focus:border-accent-coral"
         />
         {fieldErrors?.title ? (
           <span className="text-xs text-accent-coral">{fieldErrors.title}</span>
+        ) : null}
+      </label>
+
+      {/* Slug — auto-fills from title, locks once you type into it. Actions
+        * also auto-generate on the server side as a safety net, so if you
+        * leave this empty a slug still gets stamped. */}
+      <label className="block space-y-2">
+        <span className="text-sm font-medium text-foreground">
+          Slug{" "}
+          <span className="text-foreground/50">
+            (URL — /projects/&lt;slug&gt;. Auto-filled from title.)
+          </span>
+        </span>
+        <input
+          name="slug"
+          value={slug}
+          onChange={(e) => {
+            setSlugTouched(true);
+            setManualSlug(e.target.value);
+          }}
+          className="w-full rounded-2xl border border-border bg-background px-4 py-3 font-mono text-sm text-foreground outline-none transition-colors focus:border-accent-coral"
+        />
+        {fieldErrors?.slug ? (
+          <span className="text-xs text-accent-coral">{fieldErrors.slug}</span>
         ) : null}
       </label>
 
@@ -267,6 +308,45 @@ export function ProjectForm({ action, defaults, submitLabel }: Props) {
           />
           <span className="text-foreground">Feature at top of /projects</span>
         </label>
+      </div>
+
+      {/* Long-form case-study body. Rendered by MarkdownRenderer on the
+        * public /projects/[slug] page. Skipping a live-preview here on
+        * purpose to keep the form compact — flip to the admin blog
+        * editor if you want to see the split view pattern. Leave empty
+        * and the detail page shows just summary + tech + links. */}
+      <label className="block space-y-2">
+        <span className="text-sm font-medium text-foreground">
+          Case-study body{" "}
+          <span className="text-foreground/50">
+            (markdown — optional but recommended for featured projects)
+          </span>
+        </span>
+        <textarea
+          name="longMarkdown"
+          rows={16}
+          defaultValue={defaults?.longMarkdown ?? ""}
+          placeholder="## The problem&#10;&#10;What was broken or missing…&#10;&#10;## The approach&#10;&#10;What you built and why…"
+          className="w-full rounded-2xl border border-border bg-background px-4 py-3 font-mono text-sm text-foreground outline-none transition-colors focus:border-accent-coral"
+        />
+        {fieldErrors?.longMarkdown ? (
+          <span className="text-xs text-accent-coral">
+            {fieldErrors.longMarkdown}
+          </span>
+        ) : null}
+      </label>
+
+      {/* Screenshots grid — each upload is added to a hidden CSV input. */}
+      <div className="space-y-2">
+        <span className="text-sm font-medium text-foreground">
+          Screenshots{" "}
+          <span className="text-foreground/50">(shown as a grid on the detail page)</span>
+        </span>
+        <ScreenshotUploader
+          name="screenshots"
+          defaultUrls={defaults?.screenshots ?? []}
+          fieldError={fieldErrors?.screenshots}
+        />
       </div>
 
       {formError ? (
