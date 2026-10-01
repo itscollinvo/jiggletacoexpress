@@ -66,10 +66,11 @@ export function ProjectForm({ action, defaults, submitLabel }: Props) {
   const slug = slugTouched ? manualSlug : slugify(title);
 
   return (
-    // encType="multipart/form-data" is REQUIRED to send files in a form
-    // submission. Without it, the file input's value is sent as just a name
-    // string, not the actual binary contents.
-    <form action={formAction} encType="multipart/form-data" className="space-y-6">
+    // Form action is a React Server Action — React 19 handles encType and
+    // method for us. Setting encType="multipart/form-data" manually is
+    // now a hydration warning, and file inputs work regardless: RSC
+    // automatically encodes FormData with any files it contains.
+    <form action={formAction} className="space-y-6">
       {/* Title */}
       <label className="block space-y-2">
         <span className="text-sm font-medium text-foreground">Title</span>

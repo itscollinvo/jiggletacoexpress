@@ -21,6 +21,7 @@
 import Link from "next/link";
 import { GithubIcon } from "./BrandIcons";
 import { HoverLift } from "./motion/HoverLift";
+import { TiltCard } from "./motion/TiltCard";
 import { getEffectiveSlug } from "@/lib/util/project-slug";
 import type { Project } from "@/lib/db/schema";
 
@@ -76,6 +77,10 @@ function ExternalLinkIcon({ className }: { className?: string }) {
 export function ProjectCard({ project }: { project: Project }) {
   const slug = getEffectiveSlug(project);
   return (
+    // TiltCard wraps HoverLift so the whole thing feels physical: cursor-
+    // relative rotation while hovering, spring scale on hover/tap. Both
+    // primitives silently no-op under prefers-reduced-motion.
+    <TiltCard className="h-full" maxTilt={4}>
     <HoverLift className="h-full">
       {/* "Linked card" pattern:
        *   - Article is the visual container with hover state
@@ -174,5 +179,6 @@ export function ProjectCard({ project }: { project: Project }) {
         </div>
       </article>
     </HoverLift>
+    </TiltCard>
   );
 }

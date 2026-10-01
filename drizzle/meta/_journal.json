@@ -71,6 +71,13 @@
       "when": 1790755098263,
       "tag": "0009_wooden_masque",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1790796892450,
+      "tag": "0010_ancient_nightshade",
+      "breakpoints": true
     }
   ]
 }
