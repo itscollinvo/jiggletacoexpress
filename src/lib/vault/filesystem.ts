@@ -170,6 +170,32 @@ export function resolvePath(
   return start;
 }
 
+/**
+ * Turn a user-typed path into an absolute slug array, WITHOUT consulting the
+ * folder tree. Handles `~`, leading `/`, `.` and `..`. Returns null if `..`
+ * would climb above the root.
+ *
+ * Why separate from resolvePath? resolvePath needs the whole VaultData tree
+ * (client-side, already loaded). Server actions don't have that — they check
+ * existence with real DB queries instead — so they only need the string work.
+ */
+export function normalizePath(input: string, cwd: Cwd): string[] | null {
+  const raw = input.trim();
+  const absolute = raw.startsWith("~") || raw.startsWith("/");
+  const out: string[] = absolute ? [] : [...cwd];
+  const parts = raw.replace(/^~/, "").split("/").filter(Boolean);
+  for (const p of parts) {
+    if (p === ".") continue;
+    if (p === "..") {
+      if (out.length === 0) return null;
+      out.pop();
+      continue;
+    }
+    out.push(p);
+  }
+  return out;
+}
+
 /** Visible slug for display; guests skip hidden folders on regular ls. */
 export function folderChildren(node: FolderNode | null, data: VaultData): FolderNode[] {
   return node ? node.children : data.roots;
