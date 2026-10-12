@@ -37,6 +37,7 @@ import {
   rmdirAction,
   touchAction,
   rmAction,
+  chmodAction,
   type CmdResult,
 } from "@/app/vault/actions";
 
@@ -280,7 +281,7 @@ export function VaultTerminal({
     }
 
     // Write commands
-    const writeCmds = new Set(["mkdir", "rmdir", "touch", "rm"]);
+    const writeCmds = new Set(["mkdir", "rmdir", "touch", "rm", "chmod"]);
     if (writeCmds.has(head!)) {
       if (!isAdmin) {
         push(null, [
@@ -302,6 +303,12 @@ export function VaultTerminal({
       }
       if (head === "touch") {
         const r = await touchAction({ cwd, arg });
+        push(null, [renderCmdResult(r)]);
+        if (r.ok) router.refresh();
+        return;
+      }
+      if (head === "chmod") {
+        const r = await chmodAction({ cwd, arg });
         push(null, [renderCmdResult(r)]);
         if (r.ok) router.refresh();
         return;
@@ -593,6 +600,7 @@ function helpLines(isAdmin: boolean): OutputLine[] {
       mkLine("output", "  rmdir <name>      delete empty folder"),
       mkLine("output", "  touch <name>      new file (note; YYYY-MM-DD.md → journal)"),
       mkLine("output", "  rm <name>         delete a file (with confirm)"),
+      mkLine("output", "  chmod -r <path>   hide from guests (+r to show again)"),
     );
   }
   return base;

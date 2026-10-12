@@ -21,10 +21,16 @@ import {
   deleteVaultNote,
   deleteVaultPhoto,
   deleteVaultJournalEntry,
+  setFolderPublic,
+  setNotePublic,
+  setPhotoPublic,
+  setJournalPublic,
 } from "@/lib/db/queries/vault";
 import {
   RESERVED_FOLDER_SLUGS,
   LEGACY_GENERAL_SLUG,
+  KINDS,
+  normalizePath,
 } from "@/lib/vault/filesystem";
 
 export type CmdResult =
@@ -249,4 +255,105 @@ export async function rmAction(input: {
   }
 
   return { ok: false, message: `rm: '${name}': no such file` };
+}
+
+const CHMOD_USAGE = "usage: chmod +r|-r <path>   (+r = visible to guests, -r = hidden)";
+
+/**
+ * chmodAction — flips `is_public` on a folder or file.
+ *
+ *   chmod -r secret-notes/   → hidden: guests see it in red, cd/cat refuse
+ *   chmod +r secret-notes/   → visible to everyone again
+ *
+ * Why "r"? In Unix, `r` is the read bit, and a guest's only power in the vault
+ * is reading. Removing read = hiding. We only support +r / -r (not the full
+ * rwx / octal grammar) because is_public is a single boolean — a bigger
+ * syntax would promise permissions the data model can't express.
+ *
+ * Path is resolved against the cwd the client sends. A folder match wins over
+ * a file match; since folder slugs are kebab-case and note names usually carry
+ * an extension, collisions are rare and the rule is easy to predict.
+ */
+export async function chmodAction(input: {
+  cwd: string[];
+  arg: string;
+}): Promise<CmdResult> {
+  // Auth is re-verified on the server on EVERY call — the client's isAdmin
+  // flag is only a UI hint and can be faked from devtools.
+  try {
+    await requireCurrentUser();
+  } catch {
+    return { ok: false, message: "permission denied — run 'admin login'" };
+  }
+
+  const trimmed = input.arg.trim();
+  const mode = trimmed.split(/\s+/)[0] ?? "";
+  const target = trimmed.slice(mode.length).trim();
+  if (!mode || !target) return { ok: false, message: `chmod: ${CHMOD_USAGE}` };
+  if (mode !== "+r" && mode !== "-r") {
+    return { ok: false, message: `chmod: invalid mode '${mode}' — ${CHMOD_USAGE}` };
+  }
+  const makePublic = mode === "+r";
+  const verb = makePublic ? "visible" : "hidden";
+
+  const path = normalizePath(target, input.cwd);
+  if (!path) return { ok: false, message: `chmod: '${target}': no such file or folder` };
+  if (path.length === 0) {
+    return { ok: false, message: "chmod: cannot change the vault root" };
+  }
+
+  // /general/notes|photos|journal are virtual directories (filters over one
+  // folder), not DB rows — there is nothing to flip.
+  if (
+    path.length === 2 &&
+    path[0] === LEGACY_GENERAL_SLUG &&
+    (KINDS as string[]).includes(path[1]!)
+  ) {
+    return {
+      ok: false,
+      message: `chmod: '${path[1]}' is a virtual directory — chmod the files inside it`,
+    };
+  }
+
+  // 1) Folder?
+  const folder = await getFolderByPath(path);
+  if (folder) {
+    await setFolderPublic(folder.id, makePublic);
+    revalidatePath("/vault/home");
+    return { ok: true, message: `${path.join("/")}/ is now ${verb}` };
+  }
+
+  // 2) File? Parent is everything but the last segment. Same legacy rule as
+  // touch/rm: inside /general/<kind>, files really live in /general.
+  const name = path[path.length - 1]!;
+  const parentPath = path.slice(0, -1);
+  const folderPath =
+    parentPath.length === 2 && parentPath[0] === LEGACY_GENERAL_SLUG
+      ? [LEGACY_GENERAL_SLUG]
+      : parentPath;
+  const notFound = { ok: false, message: `chmod: '${target}': no such file or folder` } as const;
+  if (folderPath.length === 0) return notFound; // files can't live at the root
+  const parent = await getFolderByPath(folderPath);
+  if (!parent) return notFound;
+
+  const note = await findNoteByName(parent.id, name);
+  if (note) {
+    await setNotePublic(note.id, makePublic);
+    revalidatePath("/vault/home");
+    return { ok: true, message: `${name} is now ${verb}` };
+  }
+  const photo = await findPhotoByName(parent.id, name);
+  if (photo) {
+    await setPhotoPublic(photo.id, makePublic);
+    revalidatePath("/vault/home");
+    return { ok: true, message: `${name} is now ${verb}` };
+  }
+  const journal = await findJournalByName(parent.id, name.replace(/\.md$/, ""));
+  if (journal) {
+    await setJournalPublic(journal.id, makePublic);
+    revalidatePath("/vault/home");
+    return { ok: true, message: `${name} is now ${verb}` };
+  }
+
+  return notFound;
 }

@@ -46,3 +46,6 @@ next-env.d.ts
 .env*.local
 
 .env*.local
+
+# local scratch for unpublished blog drafts
+.blog-drafts/

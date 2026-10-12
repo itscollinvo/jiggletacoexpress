@@ -264,3 +264,39 @@ export async function findJournalByName(folderId: number, entryDate: string) {
     .limit(1);
   return row ?? null;
 }
+
+// ── Visibility toggles (chmod) ───────────────────────────────────────────────
+// One tiny UPDATE per table. We bump updated_at by hand because Postgres has
+// no ON UPDATE trigger for it here — Drizzle only sets it if we tell it to.
+
+export async function setFolderPublic(id: number, isPublic: boolean) {
+  const db = getDb();
+  await db
+    .update(vaultFolders)
+    .set({ isPublic, updatedAt: new Date() })
+    .where(eq(vaultFolders.id, id));
+}
+
+export async function setNotePublic(id: number, isPublic: boolean) {
+  const db = getDb();
+  await db
+    .update(vaultNotes)
+    .set({ isPublic, updatedAt: new Date() })
+    .where(eq(vaultNotes.id, id));
+}
+
+export async function setPhotoPublic(id: number, isPublic: boolean) {
+  const db = getDb();
+  await db
+    .update(vaultPhotos)
+    .set({ isPublic, updatedAt: new Date() })
+    .where(eq(vaultPhotos.id, id));
+}
+
+export async function setJournalPublic(id: number, isPublic: boolean) {
+  const db = getDb();
+  await db
+    .update(vaultJournal)
+    .set({ isPublic, updatedAt: new Date() })
+    .where(eq(vaultJournal.id, id));
+}
