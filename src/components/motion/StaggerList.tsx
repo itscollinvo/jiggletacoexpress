@@ -12,11 +12,11 @@
  *     ))}
  *   </StaggerList>
  *
- * Same accessibility guarantees as FadeIn — reduced-motion collapses to
- * plain children with no animation.
+ * Same accessibility guarantees as FadeIn: with reduced motion the items
+ * fade in without moving (global MotionConfig in providers.tsx).
  */
 
-import { motion, useReducedMotion } from "framer-motion";
+import { motion } from "framer-motion";
 import type { ReactNode } from "react";
 
 interface ListProps {
@@ -31,11 +31,6 @@ export function StaggerList({
   className,
   stagger = 0.06,
 }: ListProps) {
-  const reduced = useReducedMotion();
-
-  if (reduced) {
-    return <div className={className}>{children}</div>;
-  }
 
   return (
     <motion.div
@@ -61,11 +56,6 @@ interface ItemProps {
 }
 
 export function StaggerItem({ children, className }: ItemProps) {
-  const reduced = useReducedMotion();
-
-  if (reduced) {
-    return <div className={className}>{children}</div>;
-  }
 
   return (
     <motion.div

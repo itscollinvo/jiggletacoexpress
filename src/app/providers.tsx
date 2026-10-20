@@ -10,6 +10,7 @@
  * the children become a client boundary.
  */
 
+import { MotionConfig } from "framer-motion";
 import { ThemeProvider } from "next-themes";
 import type { ReactNode } from "react";
 
@@ -33,7 +34,13 @@ export function Providers({ children }: { children: ReactNode }) {
       // hover states / other state changes.
       disableTransitionOnChange
     >
-      {children}
+      {/* reducedMotion="user": when the OS asks for reduced motion, every
+        * framer-motion animation on the site drops movement (x/y/scale/
+        * rotate) and keeps only fades. Doing it once here means components
+        * don't need their own `if (reduced) return <div>` branches, which
+        * caused hydration mismatches: the server can't read the OS
+        * setting, so it rendered different HTML than the browser. */}
+      <MotionConfig reducedMotion="user">{children}</MotionConfig>
     </ThemeProvider>
   );
 }

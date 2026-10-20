@@ -36,15 +36,15 @@ reduced motion.
 
 - [x] **H.1 Foundations.** Libraries, shared 3D canvas (`ThreeProvider`,
   `SceneSlot`), motion tiers (`useMotionTier`), Lenis smooth scroll.
-- [ ] **H.2 Album-art colors.** Extract palette server-side, cache per album,
+- [x] **H.2 Album-art colors.** Extract palette server-side, cache per album,
   fade accent CSS variables; theme colors as fallback; keep text contrast.
-- [ ] **H.3 The blob.** Shader, cursor bulge, playing/idle breathing; two-column
+- [x] **H.3 The blob.** Shader, cursor bulge, playing/idle breathing; two-column
   hero on desktop; lighter version on phones.
-- [ ] **H.4 Headline + micro-interactions.** Text reveal, jiggle, cursor
+- [x] **H.4 Headline + micro-interactions.** Text reveal, jiggle, cursor
   spotlight, magnetic buttons.
-- [ ] **H.5 Scroll reveals.** Existing motion components on scroll; make sure
+- [x] **H.5 Scroll reveals.** Existing motion components on scroll; make sure
   in-page anchors work with Lenis.
-- [ ] **H.6 The wall (no climber).** Strip, bolts aligned to real section
+- [x] **H.6 The wall (no climber).** Strip, bolts aligned to real section
   positions, rope, clickable labeled quickdraws.
 - [ ] **H.7 The climber.** Model pipeline, scroll-driven position, clip-in move
   at each bolt; 2D version on phones.

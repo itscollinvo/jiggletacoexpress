@@ -40,7 +40,8 @@ export function accentsFromPalette(
 
   // Second accent: the first other swatch whose hue is clearly different,
   // so the two accents don't look like the same color twice. If the cover
-  // is all one hue, rotate the main hue 40° around the wheel instead.
+  // is all one hue, use a much lighter/darker shade of it instead (a
+  // monochrome cover gets a monochrome theme, not a made-up color).
   const candidates = [
     palette.lightVibrant,
     palette.muted,
@@ -51,7 +52,7 @@ export function accentsFromPalette(
     candidates.find((c) => {
       const [h2, s2] = hexToHsl(c);
       return s2 >= 15 && hueDistance(h, h2) >= 25;
-    }) ?? hslToHex([(h + 40) % 360, s, l]);
+    }) ?? hslToHex([h, s, l > 50 ? l - 30 : l + 30]);
 
   const darkBg = luminance(background) < 0.5;
   // Keep accents punchy even if the cover is fairly washed out.

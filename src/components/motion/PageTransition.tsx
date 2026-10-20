@@ -14,11 +14,19 @@
  *   into place. Cleaner on modern hardware.
  *
  * Accessibility:
- *   prefers-reduced-motion collapses to a plain fragment. No animation,
- *   no wrapper div (fragment means zero DOM cost).
+ *   prefers-reduced-motion is handled by <MotionConfig reducedMotion="user">
+ *   in providers.tsx:
+ *   framer-motion skips the movement (the y offset) and keeps only the
+ *   opacity fade, which doesn't cause motion sickness.
+ *
+ *   It used to return a bare fragment when reduced motion was on. That broke
+ *   hydration: on the server useReducedMotion() can't know the setting, so
+ *   the server rendered the <div> and the browser rendered a fragment, and
+ *   React threw away and rebuilt the page. Rendering the same element either
+ *   way keeps server and client HTML identical.
  */
 
-import { motion, useReducedMotion } from "framer-motion";
+import { motion } from "framer-motion";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 
@@ -28,10 +36,6 @@ interface Props {
 
 export function PageTransition({ children }: Props) {
   const pathname = usePathname();
-  const reduced = useReducedMotion();
-
-  if (reduced) return <>{children}</>;
-
   return (
     <motion.div
       key={pathname}

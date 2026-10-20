@@ -9,7 +9,7 @@
  * new section, please look at it."
  */
 
-import { motion, useReducedMotion } from "framer-motion";
+import { motion } from "framer-motion";
 import { type ReactNode } from "react";
 
 type Direction = "left" | "right" | "up" | "down";
@@ -47,8 +47,6 @@ export function SlideIn({
   delay = 0,
   onScroll = true,
 }: Props) {
-  const reduced = useReducedMotion();
-  if (reduced) return <div className={className}>{children}</div>;
 
   const initial = { opacity: 0, ...offsetToInitial(from, offset) };
   const animate = { opacity: 1, x: 0, y: 0 };
