@@ -28,7 +28,24 @@
 
 import { motion } from "framer-motion";
 import { usePathname } from "next/navigation";
-import type { ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
+
+/**
+ * Has the visitor navigated within the site yet?
+ *
+ * Only animate on client-side navigations, never on the first load. The
+ * first page comes from the server as HTML; if it's wrapped in
+ * `initial={{ opacity: 0 }}`, framer-motion writes `opacity:0` into that
+ * HTML and the whole page stays invisible until React has downloaded and
+ * hydrated (~3 s on a slow phone, which PageSpeed reported as a slow
+ * Largest Contentful Paint). With `initial={false}` the server HTML is
+ * visible immediately.
+ *
+ * A module-level flag works here because it only ever flips in the
+ * browser (effects don't run on the server), and it survives route
+ * changes since this module stays loaded.
+ */
+let hasMounted = false;
 
 interface Props {
   children: ReactNode;
@@ -36,10 +53,17 @@ interface Props {
 
 export function PageTransition({ children }: Props) {
   const pathname = usePathname();
+  // Read during render: false on the server and on the first client
+  // render (so they match), true for every page after that.
+  const animateIn = hasMounted;
+  useEffect(() => {
+    hasMounted = true;
+  }, []);
+
   return (
     <motion.div
       key={pathname}
-      initial={{ opacity: 0, y: 6 }}
+      initial={animateIn ? { opacity: 0, y: 6 } : false}
       animate={{ opacity: 1, y: 0 }}
       transition={{
         duration: 0.25,
