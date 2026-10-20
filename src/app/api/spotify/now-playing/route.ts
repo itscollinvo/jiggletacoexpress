@@ -12,29 +12,23 @@
  *                                          the client doesn't retry aggressively)
  *
  * Redis cache: 30 s under key "spotify:now-playing".
+ * The album's color palette is cached separately per album (see
+ * lib/integrations/album-palette.ts), so only the first play of an album
+ * pays for the color extraction.
  * Cache-Control header also set so CDN/browser avoid redundant fetches.
  */
 
 import { NextResponse } from "next/server";
-import { Redis } from "@upstash/redis";
 import { getValidSpotifyAccessToken } from "@/lib/db/queries/integration-tokens";
 import { getCurrentlyPlaying } from "@/lib/integrations/spotify";
+import {
+  getAlbumPalette,
+  type AlbumPalette,
+} from "@/lib/integrations/album-palette";
+import { getRedis } from "@/lib/redis";
 
 const CACHE_KEY = "spotify:now-playing";
 const CACHE_TTL_S = 30;
-
-function getRedis(): Redis {
-  const url =
-    process.env.UPSTASH_REDIS_REST_URL ?? process.env.KV_REST_API_URL;
-  const token =
-    process.env.UPSTASH_REDIS_REST_TOKEN ?? process.env.KV_REST_API_TOKEN;
-  if (!url || !token) {
-    throw new Error(
-      "Redis env vars missing. Expected UPSTASH_REDIS_REST_URL/TOKEN or KV_REST_API_URL/TOKEN.",
-    );
-  }
-  return new Redis({ url, token });
-}
 
 export type NowPlayingPayload =
   | { status: "not_connected" }
@@ -48,6 +42,8 @@ export type NowPlayingPayload =
         album: string;
         albumArt: string | null;
         url: string;
+        /** Main colors of the cover, or null if extraction failed. */
+        palette: AlbumPalette | null;
       };
     };
 
@@ -81,14 +77,21 @@ export async function GET(): Promise<NextResponse> {
       payload = { status: "not_playing" };
     } else {
       const track = nowPlaying.item;
+      const images = track.album.images; // Spotify sorts these largest first
+      // Extract colors from the smallest cover (usually 64x64). Fewer pixels
+      // to crunch, and the dominant colors are the same at any size.
+      const smallest = images[images.length - 1]?.url ?? null;
+      const palette = smallest ? await getAlbumPalette(smallest) : null;
+
       payload = {
         status: "playing",
         track: {
           name: track.name,
           artist: track.artists.map((a) => a.name).join(", "),
           album: track.album.name,
-          albumArt: track.album.images[0]?.url ?? null,
+          albumArt: images[0]?.url ?? null,
           url: track.external_urls.spotify,
+          palette,
         },
       };
     }
