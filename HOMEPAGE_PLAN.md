@@ -48,7 +48,7 @@ reduced motion.
   positions, rope, clickable labeled quickdraws.
 - [x] **H.7 The climber.** Model pipeline, scroll-driven position, clip-in move
   at each bolt; 2D version on phones.
-- [ ] **H.8 Performance + accessibility pass.** Lighthouse, pause off-screen,
+- [x] **H.8 Performance + accessibility pass.** Lighthouse, pause off-screen,
   DPR caps, keyboard focus + labels, reduced-motion still frame. Blog post.
 
 ## Decisions
@@ -57,3 +57,10 @@ reduced motion.
 - Phones: lighter blob, 2D climber.
 - Motion tiers: `off` (reduced motion: no 3D, no smooth scroll),
   `lite` (touch or < 768px), `full` (desktop with mouse).
+
+## Results (PageSpeed Insights, mobile, after H.7)
+
+Performance 85 · Accessibility 96 · Best Practices 100 · SEO 100.
+H.8 fixes the two findings: the footer `> vault` link's contrast (35% → 70%
+opacity, ≥ 4.5:1 in all themes) and the headline reveal delaying LCP by
+~1.2 s (animation now starts at 1% opacity).
