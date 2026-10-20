@@ -1,35 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { Music } from "lucide-react";
-import type { NowPlayingPayload } from "@/app/api/spotify/now-playing/route";
+import { useNowPlaying } from "@/components/now-playing/NowPlayingProvider";
 
-const POLL_INTERVAL_MS = 30_000;
-
+/** Must be rendered inside <NowPlayingProvider>, which does the polling. */
 export function NowPlaying() {
-  const [state, setState] = useState<NowPlayingPayload | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    async function fetchState() {
-      try {
-        const res = await fetch("/api/spotify/now-playing");
-        if (!res.ok) throw new Error(`${res.status}`);
-        const data: NowPlayingPayload = await res.json();
-        if (!cancelled) setState(data);
-      } catch {
-        if (!cancelled) setState({ status: "error" });
-      }
-    }
-
-    fetchState();
-    const id = setInterval(fetchState, POLL_INTERVAL_MS);
-    return () => {
-      cancelled = true;
-      clearInterval(id);
-    };
-  }, []);
+  const state = useNowPlaying();
 
   if (state === null) {
     return (

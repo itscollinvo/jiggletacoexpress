@@ -14,6 +14,43 @@
  * ------------------------------------------------------------------------- */
 @custom-variant dark (&:where(.dark, .dark *));
 
+/* Register the accent colors as real, typed colors.
+ *
+ * A plain CSS variable is just text to the browser, so it can't animate
+ * it: changing `--accent-coral` from red to blue snaps instantly. With
+ * @property we tell the browser "this is a <color>", and then it can
+ * interpolate between two values like it does for `color` or `background`.
+ * That's what makes the album-art theming fade instead of jump.
+ * initial-value is required by the spec; the theme blocks below override it. */
+@property --accent-coral {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #E76F51;
+}
+@property --accent-gold {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #C99700;
+}
+@property --accent-hover {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #D9480F;
+}
+
+:root {
+  transition:
+    --accent-coral 1.2s ease,
+    --accent-gold 1.2s ease,
+    --accent-hover 1.2s ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    transition: none;
+  }
+}
+
 /* Light (warm ivory) — also the default if no class is set */
 :root,
 .light {

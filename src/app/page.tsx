@@ -7,6 +7,8 @@ import { getFeaturedProjects } from "@/lib/db/queries/projects";
 import { getPublishedPosts } from "@/lib/db/queries/blog";
 import { SlideIn } from "@/components/motion/SlideIn";
 import { Parallax } from "@/components/motion/Parallax";
+import { NowPlayingProvider } from "@/components/now-playing/NowPlayingProvider";
+import { AlbumTheme } from "@/components/now-playing/AlbumTheme";
 
 const homeDateFmt = new Intl.DateTimeFormat(undefined, {
   month: "long",
@@ -33,6 +35,10 @@ export default async function Home() {
   const latestPost = publishedPosts[0] ?? null;
 
   return (
+    // NowPlayingProvider polls Spotify once for everything on this page that
+    // cares about the current song: the widget and the accent colors.
+    <NowPlayingProvider>
+    <AlbumTheme />
     <div className="mx-auto max-w-3xl px-6 pt-20 pb-16 lg:px-12 lg:pt-16">
       {/* Hero — SlideIn from below for a stronger entrance than the R.1
         * page-transition alone. */}
@@ -169,5 +175,6 @@ export default async function Home() {
         </Link>
       </footer>
     </div>
+    </NowPlayingProvider>
   );
 }
