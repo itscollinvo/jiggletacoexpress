@@ -140,6 +140,29 @@ body {
   }
 }
 
+/* Above-the-fold fade-in that doesn't depend on JavaScript.
+ *
+ * FadeIn (framer-motion) renders `opacity: 0` into the server HTML and only
+ * animates once React has loaded. For content further down that's fine,
+ * but for anything visible on load it meant a blank gap on slow phones,
+ * and PageSpeed measured the page's main paint ~3 s late. A CSS animation
+ * starts on the very first paint instead. Like the headline, it starts at
+ * 1% opacity so the browser counts the content as painted immediately. */
+.fade-up {
+  animation: fade-up 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes fade-up {
+  from {
+    opacity: 0.01;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
 /* "jiggletaco": a wobble ripples through the letters on hover. Only on
  * devices that can actually hover (a tap would leave it stuck). */
 .jiggle-letter {
@@ -183,6 +206,7 @@ body {
 
 @media (prefers-reduced-motion: reduce) {
   .reveal-word,
+  .fade-up,
   .jiggle:hover .jiggle-letter {
     animation: none;
   }

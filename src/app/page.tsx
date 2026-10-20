@@ -69,18 +69,25 @@ export default async function Home() {
           <HeroBlob className="aspect-square w-48 shrink-0 sm:w-56 lg:w-64" />
         </div>
 
-        <FadeIn onScroll={false} delay={0.6}>
+        {/* CSS fade (not FadeIn): above-the-fold content must be visible
+          * without waiting for JavaScript. See .fade-up in globals.css. */}
+        <div className="fade-up" style={{ animationDelay: "0.45s" }}>
           <Parallax strength={20}>
             <NowPlaying />
           </Parallax>
           <p className="mt-6 text-lg text-foreground/80">Welcome to my domain.</p>
-        </FadeIn>
+        </div>
       </section>
 
-      {/* Professional intro. Sections below fade up as they scroll into view
-        * (FadeIn, H.5). The ids are anchors for the climbing-wall nav. */}
-      <FadeIn>
-      <section id="about" className="mt-12 flex flex-col gap-4 scroll-mt-16">
+      {/* Professional intro. Often on screen at load (phones especially),
+        * so it uses the CSS fade like the hero. Sections further down fade
+        * up as they scroll into view (FadeIn). The ids are anchors for the
+        * climbing-wall nav. */}
+      <section
+        id="about"
+        className="fade-up mt-12 flex flex-col gap-4 scroll-mt-16"
+        style={{ animationDelay: "0.55s" }}
+      >
         <p className="text-base leading-relaxed text-foreground/90">
           I am currently a CS student at{" "}
           <span className="text-accent-gold">
@@ -125,7 +132,6 @@ export default async function Home() {
           </Magnetic>
         </div>
       </section>
-      </FadeIn>
 
       {/* Casual about */}
       <FadeIn>
