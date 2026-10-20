@@ -10,6 +10,16 @@ import { StaggerItem, StaggerList } from "@/components/motion/StaggerList";
 import { AnimatedHeadline } from "@/components/hero/AnimatedHeadline";
 import { Magnetic } from "@/components/hero/Magnetic";
 import { Spotlight } from "@/components/hero/Spotlight";
+import { ClimbingWall } from "@/components/wall/ClimbingWall";
+
+// Bolts on the climbing wall, bottom to top. Sections that aren't on the
+// page (e.g. "Recently shipped" with no posts) are skipped automatically.
+const WALL_SECTIONS = [
+  { id: "intro", label: "Intro" },
+  { id: "about", label: "About" },
+  { id: "shipped", label: "Recently shipped" },
+  { id: "projects", label: "Projects" },
+];
 import { Parallax } from "@/components/motion/Parallax";
 import { NowPlayingProvider } from "@/components/now-playing/NowPlayingProvider";
 import { AlbumTheme } from "@/components/now-playing/AlbumTheme";
@@ -44,7 +54,9 @@ export default async function Home() {
     // cares about the current song: the widget and the accent colors.
     <NowPlayingProvider>
     <AlbumTheme />
-    <div className="mx-auto max-w-3xl px-6 pt-20 pb-16 lg:px-12 lg:pt-16">
+    <ClimbingWall sections={WALL_SECTIONS} />
+    {/* lg:pl-28 leaves room for the climbing wall next to the sidebar. */}
+    <div className="mx-auto max-w-3xl px-6 pt-20 pb-16 lg:pt-16 lg:pr-12 lg:pl-28">
       {/* Hero. The headline animates itself (CSS, see AnimatedHeadline);
         * the Now Playing row fades in just after the words land. */}
       <section id="intro" className="flex flex-col gap-6 scroll-mt-16">

@@ -44,7 +44,7 @@ reduced motion.
   spotlight, magnetic buttons.
 - [x] **H.5 Scroll reveals.** Existing motion components on scroll; make sure
   in-page anchors work with Lenis.
-- [ ] **H.6 The wall (no climber).** Strip, bolts aligned to real section
+- [x] **H.6 The wall (no climber).** Strip, bolts aligned to real section
   positions, rope, clickable labeled quickdraws.
 - [ ] **H.7 The climber.** Model pipeline, scroll-driven position, clip-in move
   at each bolt; 2D version on phones.
