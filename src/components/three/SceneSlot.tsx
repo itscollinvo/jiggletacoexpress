@@ -12,6 +12,8 @@
  *   - Server HTML and first paint: the `fallback` (or an empty box). Keeps
  *     SSR and hydration identical, and gives the page its final size right
  *     away so nothing jumps when the 3D loads.
+ *   - No hardware GPU (software WebGL), or the page is still loading: the
+ *     fallback. 3D starts once the page is loaded and idle (use3DReady).
  *   - Reduced motion ("off" tier): the fallback, forever. three.js is never
  *     downloaded.
  *   - Otherwise: the live scene, drawn into the same box.
@@ -34,8 +36,8 @@ interface Props {
 }
 
 export function SceneSlot({ className, fallback = null, children }: Props) {
-  const { tier, register } = useThreeStage();
-  const live = tier !== null && tier !== "off";
+  const { enabled, register } = useThreeStage();
+  const live = enabled;
 
   // Tell the provider a scene wants the canvas. Only once we know the
   // tier, so reduced-motion visitors never trigger a three.js download.

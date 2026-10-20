@@ -33,6 +33,7 @@ import {
   type ReactNode,
 } from "react";
 import { useMotionTier, type MotionTier } from "@/lib/hooks/useMotionTier";
+import { use3DReady } from "@/lib/hooks/use3DReady";
 
 // `ssr: false` because WebGL only exists in the browser. Next would
 // otherwise try to render the canvas on the server and crash.
@@ -43,6 +44,12 @@ const SharedCanvas = dynamic(
 
 interface ThreeContextValue {
   tier: MotionTier | null;
+  /**
+   * True once live 3D should run: motion allowed, a hardware GPU, and the
+   * page has finished loading (see use3DReady). Scenes show their static
+   * fallback until then.
+   */
+  enabled: boolean;
   /** Called by each SceneSlot on mount; returns its unregister function. */
   register: () => () => void;
 }
@@ -51,6 +58,8 @@ const ThreeContext = createContext<ThreeContextValue | null>(null);
 
 export function ThreeProvider({ children }: { children: ReactNode }) {
   const tier = useMotionTier();
+  const ready = use3DReady();
+  const enabled = ready && tier !== null && tier !== "off";
   // How many SceneSlots are on the current page. When it drops to 0
   // (navigating to a page without 3D) the canvas unmounts and frees the GPU.
   const [slotCount, setSlotCount] = useState(0);
@@ -60,13 +69,16 @@ export function ThreeProvider({ children }: { children: ReactNode }) {
     return () => setSlotCount((n) => n - 1);
   }, []);
 
-  const value = useMemo(() => ({ tier, register }), [tier, register]);
-  const showCanvas = slotCount > 0 && tier !== null && tier !== "off";
+  const value = useMemo(
+    () => ({ tier, enabled, register }),
+    [tier, enabled, register],
+  );
+  const showCanvas = enabled && slotCount > 0 && tier !== null;
 
   return (
     <ThreeContext.Provider value={value}>
       {children}
-      {showCanvas ? <SharedCanvas tier={tier} /> : null}
+      {showCanvas && tier ? <SharedCanvas tier={tier} /> : null}
     </ThreeContext.Provider>
   );
 }
