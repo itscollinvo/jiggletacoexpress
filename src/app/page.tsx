@@ -9,6 +9,7 @@ import { SlideIn } from "@/components/motion/SlideIn";
 import { Parallax } from "@/components/motion/Parallax";
 import { NowPlayingProvider } from "@/components/now-playing/NowPlayingProvider";
 import { AlbumTheme } from "@/components/now-playing/AlbumTheme";
+import { HeroBlob } from "@/components/blob/HeroBlob";
 
 const homeDateFmt = new Intl.DateTimeFormat(undefined, {
   month: "long",
@@ -44,11 +45,18 @@ export default async function Home() {
         * page-transition alone. */}
       <SlideIn onScroll={false} from="up" offset={20}>
       <section className="flex flex-col gap-6">
-        <h1 className="text-4xl font-bold tracking-tight text-foreground sm:text-5xl">
-          I am <span className="text-accent-coral">jiggletaco</span>, I like to
-          make life simple{" "}
-          <span className="text-accent-gold">&amp;</span> enjoyable :)
-        </h1>
+        {/* Headline + blob. Side by side from `sm` up (blob on the right),
+          * stacked on phones with the blob under the headline. The blob's
+          * box has a fixed aspect ratio so the page never jumps when the
+          * 3D swaps in for the placeholder. */}
+        <div className="flex flex-col items-center gap-4 sm:flex-row sm:items-center sm:gap-6">
+          <h1 className="text-4xl font-bold tracking-tight text-foreground sm:flex-1 sm:text-5xl">
+            I am <span className="text-accent-coral">jiggletaco</span>, I like to
+            make life simple{" "}
+            <span className="text-accent-gold">&amp;</span> enjoyable :)
+          </h1>
+          <HeroBlob className="aspect-square w-48 shrink-0 sm:w-56 lg:w-64" />
+        </div>
 
         <Parallax strength={20}>
           <NowPlaying />
