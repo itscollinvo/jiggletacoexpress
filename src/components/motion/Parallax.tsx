@@ -14,8 +14,14 @@
  * element moves through the viewport, not the whole document.
  */
 
-import { motion, useScroll, useTransform, useReducedMotion } from "framer-motion";
-import { useRef, type ReactNode } from "react";
+import {
+  motion,
+  useMotionValue,
+  useReducedMotion,
+  useScroll,
+  useTransform,
+} from "framer-motion";
+import { useEffect, useRef, type ReactNode } from "react";
 
 interface Props {
   children: ReactNode;
@@ -36,16 +42,20 @@ export function Parallax({ children, className, strength = 40 }: Props) {
     offset: ["start end", "end start"],
   });
 
-  // Map 0..1 → -strength..+strength. Element sits at neutral when centered.
-  const y = useTransform(scrollYProgress, [0, 1], [-strength, strength]);
+  // `amount` is 1 normally and 0 for reduced motion. It's a motion value
+  // (not a render branch) on purpose: the server can't know the OS setting,
+  // so the first render must be identical either way, and flipping a motion
+  // value after mount changes the style without re-rendering.
+  const amount = useMotionValue(1);
+  useEffect(() => {
+    amount.set(reduced ? 0 : 1);
+  }, [reduced, amount]);
 
-  if (reduced) {
-    return (
-      <div ref={ref} className={className}>
-        {children}
-      </div>
-    );
-  }
+  // Map 0..1 → -strength..+strength. Element sits at neutral when centered.
+  const y = useTransform(
+    [scrollYProgress, amount],
+    ([p, k]: number[]) => (p * 2 - 1) * strength * k,
+  );
 
   return (
     <motion.div ref={ref} style={{ y }} className={className}>
