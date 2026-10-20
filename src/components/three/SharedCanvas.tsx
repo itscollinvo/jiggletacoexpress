@@ -28,7 +28,9 @@ export function SharedCanvas({ tier }: { tier: MotionTier }) {
         width: "100%",
         height: "100%",
         pointerEvents: "none",
-        zIndex: 0,
+        // Above the climbing wall (z-20) so the climber draws over it, below
+        // the mobile header (z-30) and sidebar (z-40). Click-through anyway.
+        zIndex: 25,
       }}
       // Device pixel ratio. A 3x phone screen would render 9x the pixels of
       // a 1x screen. Capping it keeps the GPU cool with no visible loss.

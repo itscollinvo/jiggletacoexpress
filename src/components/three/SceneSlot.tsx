@@ -47,7 +47,9 @@ export function SceneSlot({ className, fallback = null, children }: Props) {
   // The wrapper div is the same in every state, so the box keeps its size
   // and the page never shifts when the 3D swaps in.
   return (
-    <div className={`relative ${className ?? ""}`}>
+    // aria-hidden: the 3D scenes are decoration. Screen readers get the
+    // real content (headline, section nav) and skip the empty box.
+    <div aria-hidden className={`relative ${className ?? ""}`}>
       {live ? <SceneSlotView>{children}</SceneSlotView> : fallback}
     </div>
   );

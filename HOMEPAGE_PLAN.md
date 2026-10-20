@@ -30,7 +30,7 @@ reduced motion.
 | Album colors | node-vibrant, server side in /api/spotify/now-playing |
 | Animation | framer-motion (already installed) |
 | Smooth scroll | lenis |
-| Climber | CC0 character (Quaternius) + Mixamo climbing animation, converted to .glb and compressed with gltf-transform |
+| Climber | CC0 robot by Quaternius, posed procedurally from scroll (no baked clip), compressed with gltf-transform (meshopt) |
 
 ## PRs
 
@@ -46,7 +46,7 @@ reduced motion.
   in-page anchors work with Lenis.
 - [x] **H.6 The wall (no climber).** Strip, bolts aligned to real section
   positions, rope, clickable labeled quickdraws.
-- [ ] **H.7 The climber.** Model pipeline, scroll-driven position, clip-in move
+- [x] **H.7 The climber.** Model pipeline, scroll-driven position, clip-in move
   at each bolt; 2D version on phones.
 - [ ] **H.8 Performance + accessibility pass.** Lighthouse, pause off-screen,
   DPR caps, keyboard focus + labels, reduced-motion still frame. Blog post.
