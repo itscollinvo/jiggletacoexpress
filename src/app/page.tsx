@@ -209,7 +209,7 @@ export default async function Home() {
       <footer className="mt-24 border-t border-border pt-6">
         <Link
           href="/vault"
-          className="inline-block font-mono text-xs text-foreground/35 transition-colors hover:text-accent-hover"
+          className="inline-block font-mono text-xs text-foreground/70 transition-colors hover:text-accent-hover"
         >
           &gt; vault
         </Link>
