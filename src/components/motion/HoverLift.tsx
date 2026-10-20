@@ -12,10 +12,10 @@
  *   feel natural. The visual difference is small — the FEEL difference
  *   is meaningful.
  *
- * Falls back to a passthrough div under reduced-motion.
+ * Under reduced motion the global MotionConfig skips the scale.
  */
 
-import { motion, useReducedMotion } from "framer-motion";
+import { motion } from "framer-motion";
 import type { ReactNode } from "react";
 
 interface Props {
@@ -26,12 +26,8 @@ interface Props {
 }
 
 export function HoverLift({ children, className, scale = 1.015 }: Props) {
-  const reduced = useReducedMotion();
-
-  if (reduced) {
-    return <div className={className}>{children}</div>;
-  }
-
+  // Reduced motion: the global MotionConfig (providers.tsx) skips the
+  // scale animation. No separate branch, so server and client HTML match.
   return (
     <motion.div
       className={className}

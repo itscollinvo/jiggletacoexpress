@@ -45,7 +45,9 @@ export function TiltCard({ children, className, maxTilt = 5 }: Props) {
   );
 
   function handleMouseMove(e: MouseEvent<HTMLDivElement>) {
-    if (!ref.current) return;
+    // Reduced motion: never tilt. (Same element either way, so server and
+    // client HTML match; the rotation just stays at 0.)
+    if (reduced || !ref.current) return;
     const rect = ref.current.getBoundingClientRect();
     mouseX.set((e.clientX - rect.left) / rect.width);
     mouseY.set((e.clientY - rect.top) / rect.height);
@@ -54,10 +56,6 @@ export function TiltCard({ children, className, maxTilt = 5 }: Props) {
   function handleMouseLeave() {
     mouseX.set(0.5);
     mouseY.set(0.5);
-  }
-
-  if (reduced) {
-    return <div className={className}>{children}</div>;
   }
 
   return (

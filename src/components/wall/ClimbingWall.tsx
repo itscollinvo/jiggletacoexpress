@@ -18,12 +18,16 @@
  * onto the wall.
  *
  * Desktop: a 56px wall between the sidebar and the content, with holds,
- * labels and buttons. Phones: a very thin strip with just the rope, bolts
- * and climber (no room for tap targets).
+ * labels, buttons and a 3D climber (Climber3D). Phones and reduced motion:
+ * the climber is a 2D dot, and on phones the wall is a very thin strip
+ * with just the rope, bolts and climber (no room for tap targets).
  */
 
+import dynamic from "next/dynamic";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLenis } from "lenis/react";
+import { SceneSlot } from "@/components/three/SceneSlot";
+import { useThreeStage } from "@/components/three/ThreeProvider";
 import { useScrollProgress } from "./useScrollProgress";
 import { useSectionStops, type WallSection } from "./useSectionStops";
 
@@ -48,12 +52,19 @@ function seeded(seed: number) {
   };
 }
 
-const PAD = 28; // keep the ground and the top anchor off the very edges
+const PAD = 28;
+
+// The 3D climber (three.js + the model) loads only on desktop with motion on.
+const Climber3D = dynamic(() => import("./Climber3D"), { ssr: false });
+
+/** Size of the 3D climber's box; wider than the wall so limbs can reach out. */
+const CLIMBER_BOX = 104; // keep the ground and the top anchor off the very edges
 
 export function ClimbingWall({ sections }: { sections: WallSection[] }) {
   const progress = useScrollProgress();
   const stops = useSectionStops(sections);
   const lenis = useLenis();
+  const { tier } = useThreeStage();
   const wallRef = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ w: 0, h: 0 });
 
@@ -94,6 +105,10 @@ export function ClimbingWall({ sections }: { sections: WallSection[] }) {
   }, [w, h, thin]);
 
   const climberY = progressToY(progress);
+  // Desktop with motion allowed gets the 3D climber; phones and reduced
+  // motion keep the 2D dot.
+  const show3D = !thin && w > 0 && (tier === "full" || tier === "lite");
+  const boltStops = useMemo(() => stops.map((s) => s.stop), [stops]);
   const clipped = stops.filter((s) => progress >= s.stop - 0.001);
   // Rope: from the ground, up through every clipped bolt, to the climber.
   const rope = [
@@ -198,17 +213,35 @@ export function ClimbingWall({ sections }: { sections: WallSection[] }) {
               );
             })}
 
-            {/* Placeholder climber (H.7 replaces it with the 3D model on
-                desktop). A chalky dot with a ring in the accent color. */}
-            <circle
+            {/* 2D climber for phones and reduced motion: a chalky dot with
+                a ring in the accent color. */}
+            {show3D ? null : <circle
               cx={midX}
               cy={climberY}
               r={thin ? 3 : 6}
               fill="var(--foreground)"
               stroke="var(--accent-coral)"
               strokeWidth={2}
-            />
+            />}
           </svg>
+        ) : null}
+
+        {/* 3D climber. The SceneSlot's box follows the climber's position;
+            drei's View redraws the robot wherever the box is each frame. */}
+        {show3D ? (
+          <div
+            className="pointer-events-none absolute"
+            style={{
+              left: midX - CLIMBER_BOX / 2,
+              top: climberY - CLIMBER_BOX * 0.62,
+              width: CLIMBER_BOX,
+              height: CLIMBER_BOX,
+            }}
+          >
+            <SceneSlot className="h-full w-full">
+              <Climber3D progress={progress} boltStops={boltStops} />
+            </SceneSlot>
+          </div>
         ) : null}
 
         {/* Clickable quickdraws, positioned over their bolts. Desktop only:
