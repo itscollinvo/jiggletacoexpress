@@ -22,6 +22,7 @@ import Link from "next/link";
 import { GithubIcon } from "./BrandIcons";
 import { HoverLift } from "./motion/HoverLift";
 import { TiltCard } from "./motion/TiltCard";
+import { Spotlight } from "./hero/Spotlight";
 import { getEffectiveSlug } from "@/lib/util/project-slug";
 import type { Project } from "@/lib/db/schema";
 
@@ -82,6 +83,7 @@ export function ProjectCard({ project }: { project: Project }) {
     // primitives silently no-op under prefers-reduced-motion.
     <TiltCard className="h-full" maxTilt={4}>
     <HoverLift className="h-full">
+    <Spotlight className="h-full">
       {/* "Linked card" pattern:
        *   - Article is the visual container with hover state
        *   - An invisible <Link> overlay at z-10 covers the entire card,
@@ -92,6 +94,8 @@ export function ProjectCard({ project }: { project: Project }) {
        *   - This avoids invalid nested <a> elements while still letting
        *     the whole card feel clickable */}
       <article className="group relative flex h-full flex-col overflow-hidden rounded-3xl border border-border bg-foreground/3 transition-colors hover:border-accent-coral">
+        {/* Cursor glow (H.4). Sits under the overlay link and content. */}
+        <div className="spotlight" aria-hidden />
         {/* Overlay link — the entire card clicks through to /projects/[slug].
           * aria-label duplicates the title so screen readers announce
           * something meaningful when they land on the anchor. */}
@@ -178,6 +182,7 @@ export function ProjectCard({ project }: { project: Project }) {
           )}
         </div>
       </article>
+    </Spotlight>
     </HoverLift>
     </TiltCard>
   );

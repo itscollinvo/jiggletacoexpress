@@ -5,9 +5,9 @@
  * section that should feel like it appears rather than snaps in.
  *
  * Accessibility:
- *   Respects prefers-reduced-motion. When the user has motion disabled
- *   in their OS, we render the children with no animation at all — same
- *   final visual, no distraction.
+ *   Respects prefers-reduced-motion through the global
+ *   <MotionConfig reducedMotion="user"> in providers.tsx: the rise is
+ *   dropped and only the fade remains.
  *
  * Perf:
  *   The `once: true` on whileInView means the animation only fires the
@@ -15,7 +15,7 @@
  *   come back, no re-animation. Prevents jarring re-triggers.
  */
 
-import { motion, useReducedMotion } from "framer-motion";
+import { motion } from "framer-motion";
 import type { ReactNode } from "react";
 
 interface Props {
@@ -37,11 +37,6 @@ export function FadeIn({
   className,
   onScroll = true,
 }: Props) {
-  const reduced = useReducedMotion();
-
-  if (reduced) {
-    return <div className={className}>{children}</div>;
-  }
 
   const initial = { opacity: 0, y: offset };
   const animate = { opacity: 1, y: 0 };

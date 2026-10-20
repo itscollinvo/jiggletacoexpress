@@ -40,9 +40,9 @@ reduced motion.
   fade accent CSS variables; theme colors as fallback; keep text contrast.
 - [x] **H.3 The blob.** Shader, cursor bulge, playing/idle breathing; two-column
   hero on desktop; lighter version on phones.
-- [ ] **H.4 Headline + micro-interactions.** Text reveal, jiggle, cursor
+- [x] **H.4 Headline + micro-interactions.** Text reveal, jiggle, cursor
   spotlight, magnetic buttons.
-- [ ] **H.5 Scroll reveals.** Existing motion components on scroll; make sure
+- [x] **H.5 Scroll reveals.** Existing motion components on scroll; make sure
   in-page anchors work with Lenis.
 - [ ] **H.6 The wall (no climber).** Strip, bolts aligned to real section
   positions, rope, clickable labeled quickdraws.

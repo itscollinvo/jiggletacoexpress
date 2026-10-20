@@ -14,7 +14,8 @@
  *   into place. Cleaner on modern hardware.
  *
  * Accessibility:
- *   prefers-reduced-motion is handled by <MotionConfig reducedMotion="user">:
+ *   prefers-reduced-motion is handled by <MotionConfig reducedMotion="user">
+ *   in providers.tsx:
  *   framer-motion skips the movement (the y offset) and keeps only the
  *   opacity fade, which doesn't cause motion sickness.
  *
@@ -25,7 +26,7 @@
  *   way keeps server and client HTML identical.
  */
 
-import { MotionConfig, motion } from "framer-motion";
+import { motion } from "framer-motion";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 
@@ -36,7 +37,6 @@ interface Props {
 export function PageTransition({ children }: Props) {
   const pathname = usePathname();
   return (
-    <MotionConfig reducedMotion="user">
     <motion.div
       key={pathname}
       initial={{ opacity: 0, y: 6 }}
@@ -48,6 +48,5 @@ export function PageTransition({ children }: Props) {
     >
       {children}
     </motion.div>
-    </MotionConfig>
   );
 }

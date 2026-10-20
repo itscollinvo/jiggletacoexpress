@@ -5,7 +5,11 @@ import { NowPlaying } from "@/components/NowPlaying";
 import { ProjectCard } from "@/components/ProjectCard";
 import { getFeaturedProjects } from "@/lib/db/queries/projects";
 import { getPublishedPosts } from "@/lib/db/queries/blog";
-import { SlideIn } from "@/components/motion/SlideIn";
+import { FadeIn } from "@/components/motion/FadeIn";
+import { StaggerItem, StaggerList } from "@/components/motion/StaggerList";
+import { AnimatedHeadline } from "@/components/hero/AnimatedHeadline";
+import { Magnetic } from "@/components/hero/Magnetic";
+import { Spotlight } from "@/components/hero/Spotlight";
 import { Parallax } from "@/components/motion/Parallax";
 import { NowPlayingProvider } from "@/components/now-playing/NowPlayingProvider";
 import { AlbumTheme } from "@/components/now-playing/AlbumTheme";
@@ -41,33 +45,30 @@ export default async function Home() {
     <NowPlayingProvider>
     <AlbumTheme />
     <div className="mx-auto max-w-3xl px-6 pt-20 pb-16 lg:px-12 lg:pt-16">
-      {/* Hero — SlideIn from below for a stronger entrance than the R.1
-        * page-transition alone. */}
-      <SlideIn onScroll={false} from="up" offset={20}>
-      <section className="flex flex-col gap-6">
+      {/* Hero. The headline animates itself (CSS, see AnimatedHeadline);
+        * the Now Playing row fades in just after the words land. */}
+      <section id="intro" className="flex flex-col gap-6 scroll-mt-16">
         {/* Headline + blob. Side by side from `sm` up (blob on the right),
           * stacked on phones with the blob under the headline. The blob's
           * box has a fixed aspect ratio so the page never jumps when the
           * 3D swaps in for the placeholder. */}
         <div className="flex flex-col items-center gap-4 sm:flex-row sm:items-center sm:gap-6">
-          <h1 className="text-4xl font-bold tracking-tight text-foreground sm:flex-1 sm:text-5xl">
-            I am <span className="text-accent-coral">jiggletaco</span>, I like to
-            make life simple{" "}
-            <span className="text-accent-gold">&amp;</span> enjoyable :)
-          </h1>
+          <AnimatedHeadline className="text-4xl font-bold tracking-tight text-foreground sm:flex-1 sm:text-5xl" />
           <HeroBlob className="aspect-square w-48 shrink-0 sm:w-56 lg:w-64" />
         </div>
 
-        <Parallax strength={20}>
-          <NowPlaying />
-        </Parallax>
-
-        <p className="text-lg text-foreground/80">Welcome to my domain.</p>
+        <FadeIn onScroll={false} delay={0.6}>
+          <Parallax strength={20}>
+            <NowPlaying />
+          </Parallax>
+          <p className="mt-6 text-lg text-foreground/80">Welcome to my domain.</p>
+        </FadeIn>
       </section>
-      </SlideIn>
 
-      {/* Professional intro */}
-      <section className="mt-12 flex flex-col gap-4">
+      {/* Professional intro. Sections below fade up as they scroll into view
+        * (FadeIn, H.5). The ids are anchors for the climbing-wall nav. */}
+      <FadeIn>
+      <section id="about" className="mt-12 flex flex-col gap-4 scroll-mt-16">
         <p className="text-base leading-relaxed text-foreground/90">
           I am currently a CS student at{" "}
           <span className="text-accent-gold">
@@ -79,35 +80,43 @@ export default async function Home() {
         </p>
 
         <div className="flex flex-wrap gap-3 pt-2">
-          <Link
-            href="https://linkedin.com/in/collinvo"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 rounded-md border border-border px-4 py-2 text-sm transition-colors hover:border-accent-coral hover:text-accent-hover"
-          >
-            <LinkedinIcon className="h-4 w-4" />
-            LinkedIn
-          </Link>
-          <Link
-            href="mailto:collinvo26@gmail.com"
-            className="inline-flex items-center gap-2 rounded-md border border-border px-4 py-2 text-sm transition-colors hover:border-accent-coral hover:text-accent-hover"
-          >
-            <Mail className="h-4 w-4" />
-            Email
-          </Link>
-          <Link
-            href="https://github.com/itscollinvo"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 rounded-md border border-border px-4 py-2 text-sm transition-colors hover:border-accent-coral hover:text-accent-hover"
-          >
-            <GithubIcon className="h-4 w-4" />
-            GitHub
-          </Link>
+          <Magnetic>
+            <Link
+              href="https://linkedin.com/in/collinvo"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 rounded-md border border-border px-4 py-2 text-sm transition-colors hover:border-accent-coral hover:text-accent-hover"
+            >
+              <LinkedinIcon className="h-4 w-4" />
+              LinkedIn
+            </Link>
+          </Magnetic>
+          <Magnetic>
+            <Link
+              href="mailto:collinvo26@gmail.com"
+              className="inline-flex items-center gap-2 rounded-md border border-border px-4 py-2 text-sm transition-colors hover:border-accent-coral hover:text-accent-hover"
+            >
+              <Mail className="h-4 w-4" />
+              Email
+            </Link>
+          </Magnetic>
+          <Magnetic>
+            <Link
+              href="https://github.com/itscollinvo"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 rounded-md border border-border px-4 py-2 text-sm transition-colors hover:border-accent-coral hover:text-accent-hover"
+            >
+              <GithubIcon className="h-4 w-4" />
+              GitHub
+            </Link>
+          </Magnetic>
         </div>
       </section>
+      </FadeIn>
 
       {/* Casual about */}
+      <FadeIn>
       <section className="mt-12">
         <p className="text-base leading-relaxed text-foreground/80">
           All else: let&apos;s keep this brief and casual. I guess this is where
@@ -116,13 +125,15 @@ export default async function Home() {
           spot, and I enjoy nature.
         </p>
       </section>
+      </FadeIn>
 
       {/* Latest blog post teaser — hidden entirely when no posts are
         * published yet, so the section doesn't leave an empty gap in the
         * layout. `latestPost` comes from getPublishedPosts()[0] which is
         * already sorted by publishedAt DESC. */}
       {latestPost ? (
-        <section className="mt-16">
+        <FadeIn>
+        <section id="shipped" className="mt-16 scroll-mt-16">
           <div className="flex items-baseline justify-between">
             <h2 className="text-2xl font-bold text-foreground">
               Recently shipped
@@ -134,10 +145,12 @@ export default async function Home() {
               all posts →
             </Link>
           </div>
+          <Spotlight className="mt-6 rounded-3xl">
           <Link
             href={`/blog/${latestPost.slug}`}
-            className="group mt-6 block rounded-3xl border border-border p-6 transition-colors hover:border-accent-coral hover:bg-foreground/3"
+            className="group relative block overflow-hidden rounded-3xl border border-border p-6 transition-colors hover:border-accent-coral hover:bg-foreground/3"
           >
+            <div className="spotlight" aria-hidden />
             <div className="flex flex-wrap items-baseline justify-between gap-3">
               <h3 className="text-lg font-semibold text-foreground transition-colors group-hover:text-accent-hover">
                 {latestPost.title}
@@ -157,17 +170,24 @@ export default async function Home() {
               </p>
             ) : null}
           </Link>
+          </Spotlight>
         </section>
+        </FadeIn>
       ) : null}
 
       {/* Project showcase */}
-      <section className="mt-16">
-        <h2 className="mb-6 text-2xl font-bold text-foreground">Projects</h2>
-        <div className="grid gap-4 sm:grid-cols-2">
+      <section id="projects" className="mt-16 scroll-mt-16">
+        <FadeIn>
+          <h2 className="mb-6 text-2xl font-bold text-foreground">Projects</h2>
+        </FadeIn>
+        {/* Cards rise in one after another as the grid scrolls into view. */}
+        <StaggerList className="grid gap-4 sm:grid-cols-2">
           {projects.map((project) => (
-            <ProjectCard key={project.id} project={project} />
+            <StaggerItem key={project.id} className="h-full">
+              <ProjectCard project={project} />
+            </StaggerItem>
           ))}
-        </div>
+        </StaggerList>
       </section>
 
       {/* Terminal-style vault easter egg. Meant to look like a prompt at
