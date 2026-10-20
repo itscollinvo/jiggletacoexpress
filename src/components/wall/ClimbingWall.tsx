@@ -64,7 +64,7 @@ export function ClimbingWall({ sections }: { sections: WallSection[] }) {
   const progress = useScrollProgress();
   const stops = useSectionStops(sections);
   const lenis = useLenis();
-  const { tier } = useThreeStage();
+  const { enabled: threeEnabled } = useThreeStage();
   const wallRef = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ w: 0, h: 0 });
 
@@ -105,9 +105,9 @@ export function ClimbingWall({ sections }: { sections: WallSection[] }) {
   }, [w, h, thin]);
 
   const climberY = progressToY(progress);
-  // Desktop with motion allowed gets the 3D climber; phones and reduced
-  // motion keep the 2D dot.
-  const show3D = !thin && w > 0 && (tier === "full" || tier === "lite");
+  // Desktop with live 3D gets the 3D climber; phones, reduced motion and
+  // devices without a hardware GPU keep the 2D dot.
+  const show3D = !thin && w > 0 && threeEnabled;
   const boltStops = useMemo(() => stops.map((s) => s.stop), [stops]);
   const clipped = stops.filter((s) => progress >= s.stop - 0.001);
   // Rope: from the ground, up through every clipped bolt, to the climber.
